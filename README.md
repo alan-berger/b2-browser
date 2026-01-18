@@ -6,14 +6,14 @@ A lightweight, user-friendly PHP web interface for browsing and downloading file
 
 ## Features
 
-- 📁 **Intuitive folder navigation** - Browse through your B2 bucket hierarchy
-- ⬇️ **Streaming downloads** - Efficiently download files of any size without memory issues
-- 🔒 **Secure authentication** - Optional HTTP Basic Auth with session timeout
-- 🎥 **Media support** - Specialized handling for videos (MP4) and images (JPG)
-- 🔍 **Client-side filtering** - Filter by file type and search by filename
-- 📱 **Mobile responsive** - Works seamlessly on desktop and mobile devices
-- ⚡ **Performance optimized** - Session caching reduces API calls
-- 🛡️ **Security hardened** - Protection against directory traversal and other attacks
+- **Intuitive folder navigation** - Browse through your B2 bucket hierarchy
+- **Streaming downloads** - Efficiently download files of any size without memory issues
+- **Secure authentication** - Optional HTTP Basic Auth with session timeout
+- **Media support** - Specialized handling for videos (MP4) and images (JPG)
+- **Client-side filtering** - Filter by file type and search by filename
+- **Mobile responsive** - Works seamlessly on desktop and mobile devices
+- **Performance optimized** - Session caching reduces API calls
+- **Security hardened** - Protection against directory traversal and other attacks
 
 ## Use Cases
 
@@ -50,7 +50,7 @@ Or download the `b2-browser.php` file directly.
    - **Name**: Give it a descriptive name (e.g., "PHP File Browser - Read Only")
    - **Type of Access**: Select "Allow access to Bucket(s)" and choose your bucket
    - **Permissions**: Select **"Read Only"**
-   - **Allow List All Bucket Names**: ✅ Check this box (required)
+   - **Allow List All Bucket Names**: Check this box (required)
    - **(Optional) File Name Prefix**: Restrict access to specific folders
 5. Click **Create New Key** and save both the **Key ID** and **Application Key**
 
@@ -147,7 +147,7 @@ Navigate to `https://yourdomain.com/b2-browser.php` in your web browser.
 
 ### Downloading Files
 
-Click the **"⬇️ Download"** button next to any file to download it. Large files are streamed efficiently to prevent memory issues.
+Click the **"Download"** button next to any file to download it. Large files are streamed efficiently to prevent memory issues.
 
 ### Filtering Files
 
@@ -227,10 +227,10 @@ define('SESSION_TIMEOUT', 3600); // 1 hour
 
 ## Browser Compatibility
 
-- ✅ Chrome/Edge (latest)
-- ✅ Firefox (latest)
-- ✅ Safari (latest)
-- ✅ Mobile browsers (iOS Safari, Chrome Mobile)
+- Chrome/Edge (latest)
+- Firefox (latest)
+- Safari (latest)
+- Mobile browsers (iOS Safari, Chrome Mobile)
 
 ## Contributing
 
@@ -273,3 +273,4 @@ If you encounter any issues or have questions:
 ---
 
 **⚠️ Security Notice:** Never expose B2 credentials in public repositories. Always use environment variables or external configuration files for sensitive data.
+dd
