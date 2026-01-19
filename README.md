@@ -35,8 +35,8 @@ A lightweight, user-friendly PHP web interface for browsing and downloading file
 ### 1. Clone or Download
 
 ```bash
-git clone https://github.com/yourusername/b2-file-browser.git
-cd b2-file-browser
+git clone https://github.com/flamingdeath80/b2-browser.git
+cd b2-browser
 ```
 
 Or download the `b2-browser.php` file directly.
