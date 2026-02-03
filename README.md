@@ -9,10 +9,10 @@ A lightweight, user-friendly PHP web interface for browsing and downloading file
 - **Intuitive folder navigation** - Browse through your B2 bucket hierarchy
 - **Streaming downloads** - Efficiently download files of any size without memory issues
 - **Secure authentication** - Optional HTTP Basic Auth with session timeout
-- **Media support** - Specialized handling for videos (MP4) and images (JPG)
+- **Media support** - Specialied handling for videos (MP4) and images (JPG)
 - **Client-side filtering** - Filter by file type and search by filename
 - **Mobile responsive** - Works seamlessly on desktop and mobile devices
-- **Performance optimized** - Session caching reduces API calls
+- **Performance optimised** - Session caching reduces API calls
 - **Security hardened** - Protection against directory traversal and other attacks
 
 ## Use Cases
