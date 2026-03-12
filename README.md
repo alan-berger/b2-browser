@@ -168,10 +168,10 @@ The script includes fail2ban-style rate limiting to prevent brute force attacks.
 ┌─────────────────────────────────────────┐
 │ Failed Login Attempts (5 minute window) │
 ├─────────────────────────────────────────┤
-│ Attempt 1-4: Allowed (tracked)       │
-│ Attempt 5: Locked for 15 minutes   │
-│ After 15min: Lockout expires         │
-│ Successful: Counter resets          │
+│ Attempt 1-4: Allowed (tracked)          │
+│ Attempt 5: Locked for 15 minutes        │
+│ After 15min: Lockout expires            │
+│ Successful: Counter resets              │
 └─────────────────────────────────────────┘
 ```
 
