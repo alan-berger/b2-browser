@@ -511,7 +511,7 @@ If you encounter any issues or have questions:
 
 ## Changelog
 
-### v1.1.0 (2026-01-15)
+### v1.1.0 (2026-03-12)
 - Added Multi-Factor Authentication (TOTP) support
 - Added fail2ban-style rate limiting protection
 - Improved security with IP-based brute force protection
