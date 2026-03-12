@@ -20,6 +20,17 @@ define('B2_BUCKET_ID', 'your_bucket_id');
 define('AUTH_USERNAME', ''); // Leave empty to disable
 define('AUTH_PASSWORD', ''); // Leave empty to disable
 
+// Rate Limiting (fail2ban style protection)
+define('RATE_LIMIT_ENABLED', true);
+define('MAX_LOGIN_ATTEMPTS', 5); // Maximum failed attempts
+define('LOCKOUT_DURATION', 900); // Lockout time in seconds (15 minutes)
+define('ATTEMPT_WINDOW', 300); // Time window to track attempts (5 minutes)
+
+// Multi-Factor Authentication (TOTP)
+define('MFA_ENABLED', false); // Set to true to enable MFA
+define('MFA_SECRET', ''); // Generate using generateMFASecret() function
+define('MFA_ISSUER', 'B2 File Browser'); // Name shown in authenticator app
+
 // Session timeout in seconds (default: 30 minutes)
 define('SESSION_TIMEOUT', 1800);
 
@@ -38,6 +49,44 @@ define('USE_SESSION_CACHE', true);
 if (defined('AUTH_USERNAME') && defined('AUTH_PASSWORD') && AUTH_USERNAME !== '' && AUTH_PASSWORD !== '') {
     session_start();
     
+    // Handle logout request
+    if (isset($_GET['logout'])) {
+        session_unset();
+        session_destroy();
+        
+        // Clear HTTP Basic Auth by sending 401
+        header('WWW-Authenticate: Basic realm="B2 File Browser"');
+        header('HTTP/1.0 401 Unauthorized');
+        echo '<html><body style="font-family: Arial, sans-serif; padding: 40px; text-align: center;">';
+        echo '<h1 style="color: #2ecc71;">✅ Logged Out Successfully</h1>';
+        echo '<p style="font-size: 16px;">You have been logged out.</p>';
+        echo '<p style="font-size: 14px; color: #666;">Close your browser to complete the logout process.</p>';
+        echo '<p style="margin-top: 20px;"><a href="?" style="color: #3498db; text-decoration: none;">← Return to Login</a></p>';
+        echo '</body></html>';
+        exit;
+    }
+    
+    $clientIP = getClientIP();
+    
+    // Check rate limiting
+    $rateLimitCheck = checkRateLimit($clientIP);
+    
+    if (defined('DEBUG_MODE') && DEBUG_MODE) {
+        error_log("Rate limit check for IP {$clientIP}: " . json_encode($rateLimitCheck));
+    }
+    
+    if (!$rateLimitCheck['allowed']) {
+        $minutes = ceil($rateLimitCheck['remaining'] / 60);
+        header('HTTP/1.0 429 Too Many Requests');
+        echo '<html><body style="font-family: Arial, sans-serif; padding: 40px; text-align: center;">';
+        echo '<h1 style="color: #e74c3c;">🔒 Account Temporarily Locked</h1>';
+        echo '<p style="font-size: 18px;">Too many failed login attempts.</p>';
+        echo '<p style="font-size: 16px; color: #666;">Please try again in <strong>' . $minutes . ' minute(s)</strong>.</p>';
+        echo '<p style="font-size: 14px; color: #999;">Attempts: ' . $rateLimitCheck['attempts'] . '/' . MAX_LOGIN_ATTEMPTS . '</p>';
+        echo '</body></html>';
+        exit;
+    }
+    
     // Check if user is already authenticated
     $isAuthenticated = isset($_SESSION['authenticated']) && $_SESSION['authenticated'] === true;
     
@@ -47,30 +96,117 @@ if (defined('AUTH_USERNAME') && defined('AUTH_PASSWORD') && AUTH_USERNAME !== ''
             // Session expired
             session_unset();
             session_destroy();
+            session_start();
             $isAuthenticated = false;
-            
-            header('WWW-Authenticate: Basic realm="B2 File Browser"');
-            header('HTTP/1.0 401 Unauthorized');
-            echo '<html><body><h2>Session Expired</h2><p>Your session has expired due to inactivity. Please refresh the page to log in again.</p></body></html>';
+        }
+    }
+    
+    // Handle MFA setup request
+    if (isset($_GET['setup_mfa']) && MFA_ENABLED && !empty(MFA_SECRET)) {
+        if (!$isAuthenticated || !isset($_SESSION['username'])) {
+            header('Location: ' . strtok($_SERVER['REQUEST_URI'], '?'));
             exit;
         }
+        
+        echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>MFA Setup</title>';
+        echo '<style>body{font-family:Arial,sans-serif;max-width:600px;margin:50px auto;padding:20px;text-align:center;}';
+        echo 'h1{color:#2c3e50;}.qr-code{margin:20px 0;}.secret{background:#f5f5f5;padding:15px;border-radius:5px;font-family:monospace;font-size:18px;letter-spacing:3px;}.info{text-align:left;background:#e3f2fd;padding:15px;border-radius:5px;margin:20px 0;}</style></head><body>';
+        echo '<h1>🔐 Multi-Factor Authentication Setup</h1>';
+        echo '<div class="info"><strong>Step 1:</strong> Install an authenticator app on your phone (Google Authenticator, Authy, Microsoft Authenticator, etc.)</div>';
+        echo '<div class="info"><strong>Step 2:</strong> Scan this QR code with your authenticator app:</div>';
+        echo '<img src="' . getMFAQRCode(MFA_SECRET, $_SESSION['username']) . '" alt="QR Code" class="qr-code">';
+        echo '<div class="info"><strong>Step 3:</strong> Or manually enter this secret code:</div>';
+        echo '<div class="secret">' . chunk_split(MFA_SECRET, 4, ' ') . '</div>';
+        echo '<div class="info"><strong>Step 4:</strong> Once configured, you\'ll need to enter the 6-digit code from your app when logging in.</div>';
+        echo '<p><a href="' . strtok($_SERVER['REQUEST_URI'], '?') . '" style="color:#3498db;">← Back to File Browser</a></p>';
+        echo '</body></html>';
+        exit;
     }
     
     // If not authenticated, check credentials
     if (!$isAuthenticated) {
-        if (!isset($_SERVER['PHP_AUTH_USER']) || 
-            $_SERVER['PHP_AUTH_USER'] !== AUTH_USERNAME || 
-            $_SERVER['PHP_AUTH_PW'] !== AUTH_PASSWORD) {
+        $credentialsValid = false;
+        $mfaRequired = MFA_ENABLED && !empty(MFA_SECRET);
+        
+        // Check basic auth credentials
+        if (isset($_SERVER['PHP_AUTH_USER']) && isset($_SERVER['PHP_AUTH_PW'])) {
+            if ($_SERVER['PHP_AUTH_USER'] === AUTH_USERNAME && $_SERVER['PHP_AUTH_PW'] === AUTH_PASSWORD) {
+                $credentialsValid = true;
+            } else {
+                // Wrong username or password - record failed attempt
+                recordFailedAttempt($clientIP);
+            }
+        }
+        
+        // If credentials are invalid, deny access
+        if (!$credentialsValid) {
             header('WWW-Authenticate: Basic realm="B2 File Browser"');
             header('HTTP/1.0 401 Unauthorized');
             echo 'Authentication required';
             exit;
         }
         
-        // Authentication successful
-        $_SESSION['authenticated'] = true;
-        $_SESSION['last_activity'] = time();
-        $_SESSION['username'] = AUTH_USERNAME;
+        // If credentials are valid and MFA is enabled, check MFA code
+        if ($credentialsValid && $mfaRequired) {
+            if (isset($_POST['mfa_code'])) {
+                $mfaCode = preg_replace('/[^0-9]/', '', $_POST['mfa_code']);
+                
+                if (verifyTOTP(MFA_SECRET, $mfaCode)) {
+                    // MFA verified, authentication successful
+                    $_SESSION['authenticated'] = true;
+                    $_SESSION['last_activity'] = time();
+                    $_SESSION['username'] = AUTH_USERNAME;
+                    clearFailedAttempts($clientIP);
+                    
+                    // Redirect to remove POST data
+                    header('Location: ' . strtok($_SERVER['REQUEST_URI'], '?'));
+                    exit;
+                } else {
+                    // Invalid MFA code
+                    recordFailedAttempt($clientIP);
+                    $mfaError = 'Invalid authentication code. Please try again.';
+                }
+            }
+            
+            // Show MFA input form
+            echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">';
+            echo '<title>Two-Factor Authentication</title>';
+            echo '<style>body{font-family:Arial,sans-serif;background:#f5f5f5;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}';
+            echo '.mfa-container{background:#fff;padding:40px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,0.1);max-width:400px;width:100%;}';
+            echo 'h1{color:#2c3e50;margin-bottom:10px;font-size:24px;}p{color:#666;margin-bottom:20px;}';
+            echo '.form-group{margin-bottom:20px;}label{display:block;margin-bottom:8px;color:#555;font-weight:500;}';
+            echo 'input[type="text"]{width:100%;padding:12px;border:2px solid #ddd;border-radius:5px;font-size:18px;letter-spacing:5px;text-align:center;font-family:monospace;}';
+            echo 'input[type="text"]:focus{outline:none;border-color:#3498db;}';
+            echo '.btn{width:100%;padding:12px;background:#3498db;color:#fff;border:none;border-radius:5px;font-size:16px;cursor:pointer;transition:background 0.2s;}';
+            echo '.btn:hover{background:#2980b9;}.error{background:#fee;color:#c33;padding:12px;border-radius:5px;margin-bottom:20px;border:1px solid #fcc;}';
+            echo '.help{font-size:12px;color:#999;margin-top:10px;}</style></head><body>';
+            echo '<div class="mfa-container">';
+            echo '<h1>🔐 Two-Factor Authentication</h1>';
+            echo '<p>Enter the 6-digit code from your authenticator app</p>';
+            if (isset($mfaError)) {
+                echo '<div class="error">' . htmlspecialchars($mfaError) . '</div>';
+            }
+            echo '<form method="POST">';
+            echo '<div class="form-group">';
+            echo '<label for="mfa_code">Authentication Code</label>';
+            echo '<input type="text" id="mfa_code" name="mfa_code" maxlength="6" pattern="[0-9]{6}" required autofocus autocomplete="off">';
+            echo '<div class="help">Enter the 6-digit code from your authenticator app</div>';
+            echo '</div>';
+            echo '<button type="submit" class="btn">Verify</button>';
+            echo '</form>';
+            echo '</div>';
+            echo '<script>document.getElementById("mfa_code").focus();</script>';
+            echo '</body></html>';
+            exit;
+        }
+        
+        // If credentials are valid but MFA not required, authenticate now
+        if ($credentialsValid && !$mfaRequired) {
+            $_SESSION['authenticated'] = true;
+            $_SESSION['last_activity'] = time();
+            $_SESSION['username'] = AUTH_USERNAME;
+            clearFailedAttempts($clientIP);
+        }
     } else {
         // Update last activity time
         $_SESSION['last_activity'] = time();
@@ -228,6 +364,211 @@ class B2Api {
         $this->ensureAuth();
         return $this->authToken;
     }
+}
+
+// ============================================
+// RATE LIMITING FUNCTIONS
+// ============================================
+function getClientIP() {
+    $ipHeaders = ['HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'HTTP_X_REAL_IP', 'REMOTE_ADDR'];
+    foreach ($ipHeaders as $header) {
+        if (!empty($_SERVER[$header])) {
+            $ip = $_SERVER[$header];
+            // For X-Forwarded-For, take the first IP
+            if (strpos($ip, ',') !== false) {
+                $ip = explode(',', $ip)[0];
+            }
+            return trim($ip);
+        }
+    }
+    return 'UNKNOWN';
+}
+
+function checkRateLimit($ip) {
+    if (!RATE_LIMIT_ENABLED) {
+        return ['allowed' => true];
+    }
+    
+    $attemptsFile = sys_get_temp_dir() . '/b2_login_attempts.json';
+    $attempts = [];
+    
+    if (file_exists($attemptsFile)) {
+        $data = file_get_contents($attemptsFile);
+        $attempts = json_decode($data, true) ?: [];
+    }
+    
+    $now = time();
+    
+    // Clean old attempts
+    foreach ($attempts as $key => $data) {
+        if ($now - $data['first_attempt'] > ATTEMPT_WINDOW) {
+            unset($attempts[$key]);
+        }
+    }
+    
+    // Check if IP is locked out
+    if (isset($attempts[$ip])) {
+        $ipData = $attempts[$ip];
+        
+        // Check if currently locked out
+        if (isset($ipData['locked_until']) && $now < $ipData['locked_until']) {
+            $remainingTime = $ipData['locked_until'] - $now;
+            return [
+                'allowed' => false,
+                'locked' => true,
+                'remaining' => $remainingTime,
+                'attempts' => $ipData['count']
+            ];
+        }
+        
+        // Reset if lockout expired
+        if (isset($ipData['locked_until']) && $now >= $ipData['locked_until']) {
+            unset($attempts[$ip]);
+        }
+    }
+    
+    // Check current attempt count
+    if (isset($attempts[$ip]) && $attempts[$ip]['count'] >= MAX_LOGIN_ATTEMPTS) {
+        $attempts[$ip]['locked_until'] = $now + LOCKOUT_DURATION;
+        file_put_contents($attemptsFile, json_encode($attempts));
+        
+        return [
+            'allowed' => false,
+            'locked' => true,
+            'remaining' => LOCKOUT_DURATION,
+            'attempts' => $attempts[$ip]['count']
+        ];
+    }
+    
+    return ['allowed' => true];
+}
+
+function recordFailedAttempt($ip) {
+    if (!RATE_LIMIT_ENABLED) {
+        return;
+    }
+    
+    $attemptsFile = sys_get_temp_dir() . '/b2_login_attempts.json';
+    $attempts = [];
+    
+    if (file_exists($attemptsFile)) {
+        $data = file_get_contents($attemptsFile);
+        $attempts = json_decode($data, true) ?: [];
+    }
+    
+    $now = time();
+    
+    if (!isset($attempts[$ip])) {
+        $attempts[$ip] = [
+            'count' => 1,
+            'first_attempt' => $now
+        ];
+    } else {
+        $attempts[$ip]['count']++;
+    }
+    
+    file_put_contents($attemptsFile, json_encode($attempts));
+}
+
+function clearFailedAttempts($ip) {
+    if (!RATE_LIMIT_ENABLED) {
+        return;
+    }
+    
+    $attemptsFile = sys_get_temp_dir() . '/b2_login_attempts.json';
+    
+    if (file_exists($attemptsFile)) {
+        $data = file_get_contents($attemptsFile);
+        $attempts = json_decode($data, true) ?: [];
+        
+        if (isset($attempts[$ip])) {
+            unset($attempts[$ip]);
+            file_put_contents($attemptsFile, json_encode($attempts));
+        }
+    }
+}
+
+// ============================================
+// MFA (TOTP) FUNCTIONS
+// ============================================
+function generateMFASecret($length = 16) {
+    $chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    $secret = '';
+    for ($i = 0; $i < $length; $i++) {
+        $secret .= $chars[random_int(0, strlen($chars) - 1)];
+    }
+    return $secret;
+}
+
+function base32Decode($secret) {
+    $chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    $secret = strtoupper($secret);
+    $paddingCharCount = substr_count($secret, '=');
+    $allowedValues = [6, 4, 3, 1, 0];
+    
+    if (!in_array($paddingCharCount, $allowedValues)) {
+        return false;
+    }
+    
+    $buffer = 0;
+    $bitsLeft = 0;
+    $output = '';
+    
+    for ($i = 0; $i < strlen($secret); $i++) {
+        $val = strpos($chars, $secret[$i]);
+        if ($val === false) {
+            continue;
+        }
+        
+        $buffer = ($buffer << 5) | $val;
+        $bitsLeft += 5;
+        
+        if ($bitsLeft >= 8) {
+            $output .= chr(($buffer >> ($bitsLeft - 8)) & 0xFF);
+            $bitsLeft -= 8;
+        }
+    }
+    
+    return $output;
+}
+
+function verifyTOTP($secret, $code, $timeSlice = null) {
+    if ($timeSlice === null) {
+        $timeSlice = floor(time() / 30);
+    }
+    
+    $secretKey = base32Decode($secret);
+    
+    // Check current time slice and ±1 time slice (90 second window)
+    for ($i = -1; $i <= 1; $i++) {
+        $calculatedCode = getTOTP($secretKey, $timeSlice + $i);
+        if ($calculatedCode === $code) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+function getTOTP($key, $timeSlice) {
+    $time = pack('N*', 0) . pack('N*', $timeSlice);
+    $hash = hash_hmac('sha1', $time, $key, true);
+    $offset = ord($hash[19]) & 0xf;
+    $code = (
+        ((ord($hash[$offset]) & 0x7f) << 24) |
+        ((ord($hash[$offset + 1]) & 0xff) << 16) |
+        ((ord($hash[$offset + 2]) & 0xff) << 8) |
+        (ord($hash[$offset + 3]) & 0xff)
+    ) % 1000000;
+    
+    return str_pad($code, 6, '0', STR_PAD_LEFT);
+}
+
+function getMFAQRCode($secret, $username) {
+    $issuer = urlencode(MFA_ISSUER);
+    $username = urlencode($username);
+    $otpauthUrl = "otpauth://totp/{$issuer}:{$username}?secret={$secret}&issuer={$issuer}";
+    return "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=" . urlencode($otpauthUrl);
 }
 
 // ============================================
@@ -647,13 +988,21 @@ if (!$configError) {
             <h1>📹 Camera Backup Browser</h1>
             
             <?php if (defined('AUTH_USERNAME') && AUTH_USERNAME !== '' && isset($_SESSION['authenticated'])): ?>
-                <div style="font-size: 12px; color: #666; margin-bottom: 10px;">
-                    Logged in as: <strong><?php echo htmlspecialchars($_SESSION['username']); ?></strong>
-                    <?php 
-                    $timeRemaining = SESSION_TIMEOUT - (time() - $_SESSION['last_activity']);
-                    $minutesRemaining = floor($timeRemaining / 60);
-                    ?>
-                    | Session expires in: <strong><?php echo $minutesRemaining; ?> minutes</strong>
+                <div style="font-size: 12px; color: #666; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                    <div>
+                        Logged in as: <strong><?php echo htmlspecialchars($_SESSION['username']); ?></strong>
+                        <?php 
+                        $timeRemaining = SESSION_TIMEOUT - (time() - $_SESSION['last_activity']);
+                        $minutesRemaining = floor($timeRemaining / 60);
+                        ?>
+                        | Session expires in: <strong><?php echo $minutesRemaining; ?> minutes</strong>
+                        <?php if (MFA_ENABLED && !empty(MFA_SECRET)): ?>
+                            | <a href="?setup_mfa=1" style="color: #3498db; text-decoration: none;">🔐 View MFA Setup</a>
+                        <?php endif; ?>
+                    </div>
+                    <div>
+                        <a href="?logout=1" onclick="return confirm('Are you sure you want to log out?');" style="color: #e74c3c; text-decoration: none; font-weight: 500;">🚪 Logout</a>
+                    </div>
                 </div>
             <?php endif; ?>
             
