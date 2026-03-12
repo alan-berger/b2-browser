@@ -110,7 +110,7 @@ Multi-Factor Authentication adds an extra layer of security by requiring a time-
 
 #### Step 1: Generate MFA Secret
 
-Add these temporary lines at the **end** of `b2-browser.php`:
+Add these temporary lines at the **top** of `b2-browser.php` inside the php code block:
 
 ```php
 // TEMPORARY: Generate MFA Secret
