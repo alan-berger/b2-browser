@@ -1,371 +1,240 @@
-# Backblaze B2 File Browser
+# Backblaze B2 Camera Backup Browser
 
-A lightweight, user-friendly PHP web interface for browsing and downloading files from private Backblaze B2 buckets. Perfect for camera backup systems, file archives, or any scenario where you need secure web access to B2 storage.
+A secure, feature-rich web interface for browsing and streaming camera footage stored in Backblaze B2 private buckets. Perfect for home security systems, surveillance cameras, or any scenario requiring secure remote access to video backups.
 
 ![PHP Version](https://img.shields.io/badge/PHP-%3E%3D7.4-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
+![Security](https://img.shields.io/badge/security-MFA%20%2B%20Rate%20Limiting-brightgreen)
 
 ## Features
 
-- **Intuitive folder navigation** - Browse through your B2 bucket hierarchy
-- **Streaming downloads** - Efficiently download files of any size without memory issues
-- **Secure authentication** - HTTP Basic Auth with optional Multi-Factor Authentication (TOTP)
-- **Rate limiting** - Fail2ban-style protection against brute force attacks
-- **Multi-Factor Authentication** - TOTP support (Google Authenticator, Authy, etc.)
-- **Media support** - Specialized handling for videos (MP4) and images (JPG)
-- **Client-side filtering** - Filter by file type and search by filename
-- **Mobile responsive** - Works seamlessly on desktop and mobile devices
-- **Performance optimized** - Session caching reduces API calls
-- **Security hardened** - Protection against directory traversal and other attacks
+### Security & Authentication
+- **HTTP Basic Authentication** - Password-protected access
+- **Multi-Factor Authentication (TOTP)** - Google Authenticator, Authy, etc.
+- **Rate Limiting** - Fail2ban-style brute force protection
+- **Activity Logging** - Comprehensive audit trail
+- **Email Alerts** - Real-time security notifications
+- **Secure Logout** - Clean session termination
 
-## Use Cases
+### Media Viewing
+- **Video Playback** - Stream MP4s directly in browser with full seeking support
+- **Player Controls** - Play, pause, seek, volume, fullscreen
+- **Keyboard Shortcuts** - Space to play/pause, arrows to seek, F for fullscreen
+- **Image Download** - JPG file support
+- **Mobile Responsive** - Works seamlessly on phones and tablets
 
-- Camera backup systems with RTSP feeds
-- Video surveillance archive browsing
-- Personal or business file storage access
-- Media library management
-- Backup verification and retrieval
+### File Management
+- **Folder Navigation** - Browse by year/month/day/camera structure
+- **Search & Filter** - Find files by name or type
+- **File Metadata** - Size, date, camera ID display
+- **Breadcrumb Navigation** - Easy path traversal
+
+### Performance & Reliability
+- **Streaming Downloads** - No memory limits, handles files of any size
+- **Session Caching** - Reduced API calls to B2
+- **Auto-reconnect** - Handles token expiration automatically
+- **Optimized Listing** - Pagination for large directories
 
 ## Requirements
 
 - PHP 7.4 or higher
 - PHP extensions: `curl`, `json`
 - Backblaze B2 account with a configured bucket
-- Shared hosting or web server (Apache/Nginx)
+- Web server (Apache/Nginx) or shared hosting
+- HTTPS/SSL certificate (recommended for security)
 
 ## Installation
 
-### 1. Clone or Download
+### 1. Clone Repository
 
 ```bash
 git clone https://github.com/alan-berger/b2-browser.git
 cd b2-browser
 ```
 
-Or download the `b2-browser.php` file directly.
-
 ### 2. Create Backblaze B2 Application Key
 
-1. Log in to your [Backblaze B2 account](https://www.backblaze.com/b2/cloud-storage.html)
-2. Navigate to **App Keys** under B2 Cloud Storage
-3. Click **Add a New Application Key**
-4. Configure the key:
-   - **Name**: Give it a descriptive name (e.g., "PHP File Browser - Read Only")
-   - **Type of Access**: Select "Allow access to Bucket(s)" and choose your bucket
-   - **Permissions**: Select **"Read Only"**
+1. Log in to [Backblaze B2](https://www.backblaze.com/b2/cloud-storage.html)
+2. Navigate to **App Keys** → **Add a New Application Key**
+3. Configure the key:
+   - **Name**: "Camera Browser - Read Only"
+   - **Access**: Select your specific bucket
+   - **Permissions**: **Read Only**
    - **Allow List All Bucket Names**: Check this box (required)
-   - **(Optional) File Name Prefix**: Restrict access to specific folders
-5. Click **Create New Key** and save both the **Key ID** and **Application Key**
+4. Save the **Application Key ID** and **Application Key**
+5. Note your **Bucket Name** and **Bucket ID** (found in bucket details)
 
-**Important:** You'll also need your **Bucket ID** (found in the bucket details page).
+**Minimum Required Permissions:**
+- `listFiles` - Browse bucket contents
+- `readFiles` - Download/stream files
+- `listBuckets` or `listAllBucketNames` - Required for bucket-specific keys
 
 ### 3. Configure the Script
 
-Open `b2-browser.php` and update the configuration section:
+Edit `b2-browser.php` and update the configuration section:
 
 ```php
-// ============================================
-// CONFIGURATION - FILL THESE IN
-// ============================================
+// B2 Credentials
 define('B2_KEY_ID', 'your_application_key_id');
 define('B2_APPLICATION_KEY', 'your_application_key');
 define('B2_BUCKET_NAME', 'your_bucket_name');
 define('B2_BUCKET_ID', 'your_bucket_id');
 
-// Optional: Add HTTP Basic Authentication
-define('AUTH_USERNAME', 'admin');  // Leave empty to disable
-define('AUTH_PASSWORD', 'secure_password');  // Leave empty to disable
+// Authentication
+define('AUTH_USERNAME', 'admin');
+define('AUTH_PASSWORD', 'your_secure_password');
 
-// Rate Limiting (fail2ban style protection)
-define('RATE_LIMIT_ENABLED', true);
-define('MAX_LOGIN_ATTEMPTS', 5);      // Maximum failed attempts
-define('LOCKOUT_DURATION', 900);      // Lockout time in seconds (15 minutes)
-define('ATTEMPT_WINDOW', 300);        // Time window to track attempts (5 minutes)
-
-// Multi-Factor Authentication (TOTP) - Optional but highly recommended
-define('MFA_ENABLED', false);         // Set to true to enable MFA
-define('MFA_SECRET', '');             // Generate using instructions below
-define('MFA_ISSUER', 'B2 File Browser');
-
-// Session timeout in seconds (default: 30 minutes)
-define('SESSION_TIMEOUT', 1800);
-
-// Diagnostic mode - set to false in production
-define('DEBUG_MODE', false);
+// Email Alerts
+define('YOUR_DOMAIN',   'yourdomain.com');
+define('YOUR_HOMEPAGE', 'https://yourdomain.com');
+define('ADMIN_EMAIL',   'admin@yourdomain.com');
+define('ALERT_EMAILS',  'admin@yourdomain.com,backup@yourdomain.com');
 ```
 
-### 4. Upload to Your Server
+### 4. Set Up Activity Logging
 
-Upload `b2-browser.php` to your web server via FTP, SFTP, or your hosting control panel.
+```bash
+mkdir -p /path/to/logs
+chmod 700 /path/to/logs
+touch /path/to/logs/b2_activity.log
+chmod 600 /path/to/logs/b2_activity.log
+```
 
-### 5. Access the Browser
+Update in the script:
+```php
+define('LOG_FILE_PATH', '/path/to/logs/b2_activity.log');
+```
 
-Navigate to `https://yourdomain.com/b2-browser.php` in your web browser.
+### 5. Upload to Server
 
-## Advanced Security Setup
+Upload `b2-browser.php` to your web server via SFTP or hosting control panel.
 
-### Enabling Multi-Factor Authentication (TOTP)
+### 6. Access
 
-Multi-Factor Authentication adds an extra layer of security by requiring a time-based one-time password (TOTP) in addition to your username and password.
+Navigate to `https://yourdomain.com/b2-browser.php`
+
+## Security Setup
+
+### Enable Multi-Factor Authentication (Recommended)
 
 #### Step 1: Generate MFA Secret
 
-Add these temporary lines at the **top** of `b2-browser.php` inside the php code block:
+While "MFA_ENABLED', false", add these temporary lines at the **top** of `b2-browser.php` (after `<?php`):
 
 ```php
 // TEMPORARY: Generate MFA Secret
-echo "Your MFA Secret: " . generateMFASecret() . "\n";
+function tempGenerateMFASecret($length = 16) {
+    $chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    $secret = '';
+    for ($i = 0; $i < $length; $i++) {
+        $secret .= $chars[random_int(0, strlen($chars) - 1)];
+    }
+    return $secret;
+}
+echo "Your MFA Secret: " . tempGenerateMFASecret();
 exit;
 ```
 
-Access the script in your browser, copy the generated secret, then **remove or comment out** these lines.
+Access the page, copy the secret, then **remove these lines** and set "MFA_ENABLED', true".
 
 #### Step 2: Configure MFA
 
-Update your configuration:
-
 ```php
 define('MFA_ENABLED', true);
-define('MFA_SECRET', 'ABCD1234EFGH5678IJKL');  // Paste your generated secret
-define('MFA_ISSUER', 'B2 File Browser');        // Name shown in authenticator app
+define('MFA_SECRET', 'YOUR_GENERATED_SECRET');
 ```
 
-#### Step 3: Set Up Your Authenticator App
+#### Step 3: Set Up Authenticator App
 
-1. Install an authenticator app on your phone:
-   - **Google Authenticator** (iOS/Android)
-   - **Microsoft Authenticator** (iOS/Android)
-   - **Authy** (iOS/Android/Desktop)
-   - **1Password** or **Bitwarden** (with TOTP support)
+1. Install Google Authenticator, Authy, or Microsoft Authenticator
+2. Add the MFA secret that you generated to your Authenticator app manually
+5. **Save the MFA secret** securely as a backup in a password manager for safe keeping
 
-2. Log in to the file browser with your username/password
+**Compatible Apps:**
+- Google Authenticator (iOS/Android)
+- Microsoft Authenticator (iOS/Android)
+- Authy (iOS/Android/Desktop)
+- 1Password (with TOTP support)
+- Bitwarden (with TOTP support)
 
-3. Click the **" View MFA Setup"** link in the header
+### Configure Rate Limiting
 
-4. Scan the QR code with your authenticator app OR manually enter the secret code
-
-5. **Save the secret code** in a secure location as backup
-
-#### Step 4: Login with MFA
-
-From now on, logging in requires:
-1. Username and password (HTTP Basic Auth)
-2. 6-digit code from your authenticator app
-
-**Important Notes:**
-- Your server's time must be accurate (within 90 seconds) for TOTP to work
-- Back up your MFA secret securely - if lost, you'll be locked out
-- Test MFA in a private/incognito window before logging out completely
-- The 6-digit code refreshes every 30 seconds
-
-### Rate Limiting Configuration
-
-The script includes fail2ban-style rate limiting to prevent brute force attacks.
-
-#### How It Works
-
-```
-┌─────────────────────────────────────────┐
-│ Failed Login Attempts (5 minute window) │
-├─────────────────────────────────────────┤
-│ Attempt 1-4: Allowed (tracked)          │
-│ Attempt 5: Locked for 15 minutes        │
-│ After 15min: Lockout expires            │
-│ Successful: Counter resets              │
-└─────────────────────────────────────────┘
-```
-
-#### Configuration Options
+Adjust security thresholds:
 
 ```php
-define('RATE_LIMIT_ENABLED', true);   // Enable/disable rate limiting
+define('RATE_LIMIT_ENABLED', true);
 define('MAX_LOGIN_ATTEMPTS', 5);      // Failed attempts before lockout
-define('LOCKOUT_DURATION', 900);      // Lockout duration (15 min = 900 sec)
-define('ATTEMPT_WINDOW', 300);        // Window to track attempts (5 min = 300 sec)
-```
-
-#### Recommended Settings by Security Level
-
-**High Security (Strict):**
-```php
-define('MAX_LOGIN_ATTEMPTS', 3);
-define('LOCKOUT_DURATION', 1800);     // 30 minutes
-define('ATTEMPT_WINDOW', 300);        // 5 minutes
-```
-
-**Balanced (Default):**
-```php
-define('MAX_LOGIN_ATTEMPTS', 5);
 define('LOCKOUT_DURATION', 900);      // 15 minutes
 define('ATTEMPT_WINDOW', 300);        // 5 minutes
 ```
 
-**Relaxed:**
+**Security Levels:**
+
+- **High Security**: 3 attempts, 30-minute lockout
+- **Balanced** (default): 5 attempts, 15-minute lockout
+- **Relaxed**: 10 attempts, 10-minute lockout
+
+### Email Alert Configuration
+
 ```php
-define('MAX_LOGIN_ATTEMPTS', 10);
-define('LOCKOUT_DURATION', 600);      // 10 minutes
-define('ATTEMPT_WINDOW', 600);        // 10 minutes
+define('LOG_ENABLED', true);
+define('EMAIL_ALERTS_ENABLED', true);
+define('ALERT_ON_LOGIN', true);           // Recommended
+define('ALERT_ON_FAILED_LOGIN', true);    // Recommended
+define('ALERT_ON_LOCKOUT', true);         // Recommended
+define('ALERT_ON_DOWNLOADS', false);      // Optional (can be noisy)
+define('ALERT_ON_PLAYBACK', false);       // Optional (can be noisy)
 ```
 
-#### Features
+**Email Setup Requirements:**
+1. Your server must support PHP `mail()` function
+2. Configure SPF record for your domain (prevents spam folder)
+3. Use HTTPS to protect credentials
 
-- **IP-based tracking** - Works correctly behind proxies, CloudFlare, load balancers
-- **Persistent storage** - Survives PHP restarts (stored in system temp directory)
-- **Automatic cleanup** - Old attempts expire automatically
-- **User feedback** - Shows remaining lockout time
-- **Successful login reset** - Counter clears immediately on successful auth
-
-#### Monitoring Failed Attempts
-
-Failed login attempts are stored in: `/tmp/b2_login_attempts.json`
-
-To view current lockouts (SSH/server access):
-```bash
-cat /tmp/b2_login_attempts.json | python -m json.tool
+**SPF Record Example:**
 ```
-
-To manually clear a locked IP:
-```php
-// Add this temporarily to your script, access it, then remove
-clearFailedAttempts('1.2.3.4');  // Replace with actual IP
+v=spf1 ip4:YOUR_SERVER_IP include:_spf.yourhost.com -all
 ```
-
-## Configuration Options
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `B2_KEY_ID` | Required | Your Backblaze B2 Application Key ID |
-| `B2_APPLICATION_KEY` | Required | Your Backblaze B2 Application Key |
-| `B2_BUCKET_NAME` | Required | Your B2 bucket name |
-| `B2_BUCKET_ID` | Required | Your B2 bucket ID |
-| `AUTH_USERNAME` | `''` (disabled) | HTTP Basic Auth username |
-| `AUTH_PASSWORD` | `''` (disabled) | HTTP Basic Auth password |
-| `RATE_LIMIT_ENABLED` | `true` | Enable fail2ban-style rate limiting |
-| `MAX_LOGIN_ATTEMPTS` | `5` | Failed attempts before lockout |
-| `LOCKOUT_DURATION` | `900` (15 min) | IP lockout duration in seconds |
-| `ATTEMPT_WINDOW` | `300` (5 min) | Time window for tracking attempts |
-| `MFA_ENABLED` | `false` | Enable Multi-Factor Authentication |
-| `MFA_SECRET` | `''` | TOTP secret (generate with script) |
-| `MFA_ISSUER` | `'B2 File Browser'` | Name in authenticator app |
-| `SESSION_TIMEOUT` | `1800` (30 min) | Session timeout in seconds |
-| `DEBUG_MODE` | `false` | Enable detailed error logging |
-| `FILES_PER_PAGE` | `100` | Maximum files to list per directory |
-| `USE_SESSION_CACHE` | `true` | Cache B2 auth token in session |
-
-### Recommended Timeout Values
-
-- **High security**: 900 seconds (15 minutes)
-- **Balanced**: 1800 seconds (30 minutes) - default
-- **Convenient**: 3600 seconds (1 hour)
-- **Relaxed**: 7200 seconds (2 hours)
-
-## Security Best Practices
-
-### Authentication & Access Control
-
-1. **Use Read-Only Credentials**
-   - Create a B2 application key with only `listFiles` and `readFiles` capabilities
-   - Never use your master application key
-
-2. **Enable HTTP Basic Authentication**
-   - Set `AUTH_USERNAME` and `AUTH_PASSWORD` for an extra security layer
-   - Use strong, unique passwords (minimum 16 characters recommended)
-
-3. **Enable Multi-Factor Authentication** (Highly Recommended)
-   - Adds TOTP-based 2FA protection
-   - Prevents unauthorized access even if password is compromised
-   - See [Advanced Security Setup](#advanced-security-setup) for configuration
-
-4. **Enable Rate Limiting** (Enabled by Default)
-   - Protects against brute force attacks
-   - Automatically locks out IPs after failed attempts
-   - Configurable thresholds and lockout duration
-
-### Transport Security
-
-5. **Use HTTPS**
-   - Always serve the script over HTTPS to encrypt credentials in transit
-   - Most shared hosting providers offer free SSL certificates (Let's Encrypt)
-   - HTTP Basic Auth credentials are sent with every request
-
-### Access Restrictions
-
-6. **Restrict File Access** (Optional)
-   - Use the B2 "File Name Prefix" option when creating your app key
-   - Limits access to specific folders within your bucket
-   - Example: `camera-backups/` to restrict to only that folder
-
-7. **IP Whitelisting** (Advanced)
-   - Configure your web server to only allow access from specific IPs
-   - Apache: Use `.htaccess` with `Allow from` directives
-   - Nginx: Use `allow` and `deny` directives
-
-### Code Security
-
-8. **Keep Credentials Secure**
-   - Never commit credentials to version control
-   - Use environment variables or separate config files (not tracked by Git)
-   - Restrict file permissions: `chmod 600 b2-browser.php`
-
-9. **Disable Debug Mode in Production**
-   - Set `DEBUG_MODE` to `false` to prevent exposing sensitive information
-   - Debug logs can contain API responses and system paths
-
-10. **Regular Updates**
-    - Keep your PHP version updated
-    - Monitor this repository for security updates
-    - Review your B2 application keys periodically
-
-### Monitoring & Auditing
-
-11. **Monitor Failed Login Attempts**
-    - Check `/tmp/b2_login_attempts.json` for suspicious activity
-    - Review PHP error logs regularly
-    - Consider setting up log monitoring alerts
-
-12. **Review B2 Bucket Logs** (Optional)
-    - Enable B2 bucket logging for audit trail
-    - Monitor download patterns for anomalies
-
-### Security Checklist
-
-Use this checklist to ensure your installation is secure:
-
-- [ ] Using read-only B2 application key (not master key)
-- [ ] HTTP Basic Authentication enabled with strong password
-- [ ] Multi-Factor Authentication (TOTP) enabled
-- [ ] Rate limiting enabled and configured
-- [ ] HTTPS/SSL certificate configured
-- [ ] Debug mode disabled in production
-- [ ] File permissions set correctly (600 or 640)
-- [ ] Credentials not committed to version control
-- [ ] Server time synchronized (for MFA)
-- [ ] PHP version up to date
-- [ ] Regular backups of MFA secret stored securely
 
 ## Usage
 
 ### Browsing Files
 
-1. Navigate to the script URL
-2. (If enabled) Enter your authentication credentials
-3. Browse folders by clicking on them
-4. Use breadcrumb navigation to move back up the hierarchy
+1. Log in with username and password
+2. Enter MFA code (if enabled)
+3. Navigate folders by clicking on them
+4. Use breadcrumb navigation to go back
+
+### Playing Videos
+
+1. Browse to an MP4 file
+2. Click **"Play"** button
+3. Video opens in full-screen player
+4. Use player controls or keyboard shortcuts:
+   - `Space` or `K` - Play/Pause
+   - `←` - Skip back 5 seconds
+   - `→` - Skip forward 5 seconds
+   - `F` - Fullscreen
+   - `M` - Mute/Unmute
 
 ### Downloading Files
 
-Click the **"Download"** button next to any file to download it. Large files are streamed efficiently to prevent memory issues.
+Click **"Download"** next to any file to download it.
 
 ### Filtering Files
 
-When viewing a folder with files:
-- Use the **file type dropdown** to filter by Videos, Images, or Folders
-- Use the **search box** to find files by name
+When viewing folders with files:
+- Use dropdown to filter by type (All/Videos/Images/Folders)
+- Use search box to find files by name
 - Filtering happens instantly without page reload
 
-## Folder Structure Example
+### Logging Out
 
-The script is designed to work with any folder structure, but here's an example for camera backup systems:
+Click **"Logout"** in the header. You'll be redirected to your homepage after 2 seconds.
+
+## Folder Structure
+
+The browser is designed to work with hierarchical folder structures. Example for camera systems:
 
 ```
 camera-backups/
@@ -382,99 +251,153 @@ camera-backups/
 │   │   │       └── 10-30-00.jpg
 ```
 
+**Supports any folder structure** - the example above is just one common pattern.
+
+## ⚙️ Configuration Reference
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `B2_KEY_ID` | Required | Backblaze B2 Application Key ID |
+| `B2_APPLICATION_KEY` | Required | Backblaze B2 Application Key |
+| `B2_BUCKET_NAME` | Required | B2 bucket name |
+| `B2_BUCKET_ID` | Required | B2 bucket ID |
+| `AUTH_USERNAME` | `''` (disabled) | HTTP Basic Auth username |
+| `AUTH_PASSWORD` | `''` (disabled) | HTTP Basic Auth password |
+| `RATE_LIMIT_ENABLED` | `true` | Enable brute force protection |
+| `MAX_LOGIN_ATTEMPTS` | `5` | Failed attempts before lockout |
+| `LOCKOUT_DURATION` | `900` (15 min) | IP lockout duration in seconds |
+| `ATTEMPT_WINDOW` | `300` (5 min) | Time window for tracking attempts |
+| `MFA_ENABLED` | `false` | Enable Multi-Factor Authentication |
+| `MFA_SECRET` | `''` | TOTP secret (generate with script) |
+| `SESSION_TIMEOUT` | `1800` (30 min) | Session timeout in seconds |
+| `LOG_ENABLED` | `true` | Enable activity logging |
+| `LOG_FILE_PATH` | Required | Path to log file |
+| `EMAIL_ALERTS_ENABLED` | `true` | Enable email notifications |
+| `ADMIN_EMAIL` | Required | Email alert Reply-To address |
+| `ALERT_EMAILS` | Required | Comma-separated email addresses |
+| `FILES_PER_PAGE` | `100` | Maximum files per directory, increase as needed |
+| `USE_SESSION_CACHE` | `true` | Cache B2 auth token in session |
+| `DEBUG_MODE` | `false` | Enable detailed error logging |
+
 ## Troubleshooting
 
-### "Configuration Error" Message
+### Configuration Errors
 
-Make sure you've filled in all four required credentials:
-- `B2_KEY_ID`
-- `B2_APPLICATION_KEY`
-- `B2_BUCKET_NAME`
-- `B2_BUCKET_ID`
+**"B2_KEY_ID not configured"**
+- Fill in all four B2 credentials in the configuration section
 
-### "Authentication Failed" Error
+**"Authentication failed"**
+- Verify application key credentials are correct
+- Ensure key has `listFiles` and `readFiles` permissions
+- Check "Allow List All Bucket Names" is enabled
 
-- Verify your application key credentials are correct
-- Ensure the key has the required permissions (`listFiles`, `readFiles`)
-- Check that "Allow List All Bucket Names" is enabled if using a bucket-specific key
+### Connection Issues
 
-### "Memory Exhausted" When Downloading Large Files
+**"Memory exhausted" (shouldn't happen with streaming)**
+- Check PHP memory limit: `memory_limit = 256M` in `php.ini`
 
-This shouldn't happen with the streaming implementation, but if it does:
-- Increase PHP memory limit in `php.ini`: `memory_limit = 256M`
-- Check your PHP error logs for more details
+**Video won't play**
+- Ensure HTTPS is enabled (some browsers require it)
+- Check browser console for errors
+- Try downloading the file to verify it's a valid MP4
 
-### Files Not Appearing
+**Files not appearing**
+- Enable `DEBUG_MODE` and check PHP error logs
+- Verify bucket has files in expected paths
+- Check application key has access to bucket/prefix
 
-- Enable `DEBUG_MODE` temporarily to see detailed logs
-- Check your PHP error log for "B2:" prefixed messages
-- Verify your bucket has files in the expected path
-- Ensure your application key has access to the bucket/prefix
+### Security Issues
 
-### Session Expires Too Quickly
+**"Account Temporarily Locked"**
+- Wait for lockout duration to expire
+- Check `/tmp/b2_login_attempts.json` for details
+- Adjust rate limiting if too strict
 
-Adjust `SESSION_TIMEOUT` to a higher value (in seconds):
-```php
-define('SESSION_TIMEOUT', 3600); // 1 hour
-```
+**MFA code not working**
+- Ensure server time is accurate (use NTP)
+- Verify secret was copied correctly
+- Check phone time is set to automatic
+- TOTP codes expire every 30 seconds
 
-### "Account Temporarily Locked" Message
+**Emails going to spam**
+- Add SPF record to your domain DNS
+- Use proper From address (alerts@yourdomain.com)
+- Enable DKIM if available
+- Ensure proper DMARC alignment
 
-This is rate limiting protection. Wait for the lockout duration to expire, or:
-- Check if someone is attempting to brute force your login
-- Manually clear the lockout file: `/tmp/b2_login_attempts.json`
-- Adjust rate limiting settings if too strict
-
-### MFA Code Not Working
-
-Common issues and solutions:
-- **Time sync issue**: Ensure your server time is accurate (use NTP)
-- **Wrong secret**: Verify you copied the MFA secret correctly
-- **App time mismatch**: Check your phone's time is set to automatic
-- **Code expired**: TOTP codes change every 30 seconds, enter quickly
-
-To check server time:
-```bash
-date
-```
-
-To verify MFA secret (temporarily add to script):
-```php
-echo "Current TOTP code should be: " . getTOTP(base32Decode(MFA_SECRET), floor(time()/30));
-```
-
-### Locked Out of MFA
-
-If you lose access to your authenticator app:
-
+**Locked out of MFA**
 1. Access server via SSH/FTP
-2. Edit `b2-browser.php`
+2. Edit the PHP file
 3. Temporarily set: `define('MFA_ENABLED', false);`
-4. Log in with username/password only
-5. Re-enable MFA and set up a new secret
-6. **Important**: Save backup codes this time!
+4. Log in and set up new MFA secret
+5. Re-enable MFA
 
-### Rate Limit File Permissions
+### Performance
 
-If rate limiting isn't working, check temp directory permissions:
-```bash
-ls -la /tmp/b2_login_attempts.json
-chmod 666 /tmp/b2_login_attempts.json  # If needed
+**Slow file listing**
+- Reduce `FILES_PER_PAGE` if folders have many files
+- Enable session caching (`USE_SESSION_CACHE`)
+
+**Video buffering issues**
+- Check internet connection speed
+- Try lower resolution videos if available
+- B2 egress is fast; likely local network issue
+
+## Backblaze B2 Costs
+
+**Free Tier:**
+- First 10GB storage: **Free**
+- 3× your storage in egress per month: **Free**
+
+**Example:** If you store 50GB of camera footage:
+- Storage cost: $0.006/GB/month = **$0.30/month**
+- Free egress: 150GB/month
+- Beyond free tier: $0.01/GB
+
+**For typical home camera use** (streaming occasionally in emergencies), you'll likely stay within the free egress allowance.
+
+## Security Best Practices
+
+### Must Do
+- Use read-only B2 application keys
+- Enable HTTP Basic Authentication
+- Use HTTPS/SSL certificate
+- Enable MFA for production use
+- Keep `DEBUG_MODE` disabled in production
+- Restrict file permissions (600/700)
+
+### Recommended
+- Enable email alerts for logins/lockouts
+- Regular review of activity logs
+- Use strong, unique passwords (16+ characters)
+- Keep PHP and server software updated
+- Whitelist IP addresses if possible (hosting firewall)
+
+### Advanced
+- Use B2 file name prefix restrictions
+- Monitor `/tmp/b2_login_attempts.json` for attacks
+- Set up log monitoring/alerting
+- Backups MFA secret
+
+## Activity Logging
+
+Logs are stored in JSON format at `LOG_FILE_PATH`:
+
+```json
+{"timestamp":"2026-03-14 12:00:00","event":"LOGIN_SUCCESS","username":"admin","ip":"1.2.3.4","details":{"method":"HTTP Basic Auth + MFA"}}
+{"timestamp":"2026-03-14 12:05:30","event":"VIDEO_PLAYBACK","username":"admin","ip":"1.2.3.4","details":{"filename":"camera-backups/2026/03/14/000005/12-00-00.mp4"}}
 ```
 
-## Performance Tips
+**Events logged:**
+- `LOGIN_SUCCESS` - Successful authentication
+- `LOGIN_FAILED` - Failed login attempt
+- `MFA_FAILED` - Invalid MFA code
+- `ACCOUNT_LOCKED` - Rate limit triggered
+- `LOGOUT` - User logged out
+- `FILE_DOWNLOAD` - File downloaded
+- `VIDEO_PLAYBACK` - Video streamed
 
-1. **Enable Session Caching** (default: enabled)
-   - Reduces API calls by caching the B2 auth token
-   - Token is valid for 23 hours
-
-2. **Adjust Files Per Page**
-   - If you have folders with many files, reduce `FILES_PER_PAGE`
-   - Smaller values = faster page loads
-
-3. **Use File Prefix Restriction**
-   - When creating your B2 app key, specify a prefix
-   - Reduces the scope of API queries
+**Log rotation:** Automatic at 10MB, old logs renamed with timestamp.
 
 ## Browser Compatibility
 
@@ -482,14 +405,15 @@ chmod 666 /tmp/b2_login_attempts.json  # If needed
 - Firefox (latest)
 - Safari (latest)
 - Mobile browsers (iOS Safari, Chrome Mobile)
+- Supports HTML5 video with seeking
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit issues or pull requests.
+Contributions welcome! Please feel free to submit issues or pull requests.
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
@@ -499,41 +423,56 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Acknowledgments
 
-- Built for use with [Backblaze B2 Cloud Storage](https://www.backblaze.com/b2/cloud-storage.html)
-- Designed for camera backup systems and media archives
+- Built for secure remote access to camera backup systems
+- Designed with [Backblaze B2 Cloud Storage](https://www.backblaze.com/b2/cloud-storage.html)
+- Optimized for home security and surveillance use cases
 
 ## Support
 
-If you encounter any issues or have questions:
+If you encounter issues:
+
 1. Check the [Troubleshooting](#troubleshooting) section
-2. Enable `DEBUG_MODE` and check PHP error logs
-3. Open an issue on GitHub with detailed information
+2. Enable `DEBUG_MODE` and review PHP error logs
+3. Check activity logs at `LOG_FILE_PATH`
+4. Open an issue on GitHub with:
+   - PHP version
+   - Error messages
+   - Steps to reproduce
 
 ## Changelog
 
-### v1.1.0 (2026-03-12)
-- Added Multi-Factor Authentication (TOTP) support
-- Added fail2ban-style rate limiting protection
-- Improved security with IP-based brute force protection
-- Added MFA setup page with QR code generation
-- Enhanced authentication flow with two-factor verification
-- Added user feedback for lockout status and remaining time
+### v1.2.0 (2026-03-14)
+- Added video playback with HTML5 player
+- HTTP Range support for video seeking
+- Keyboard shortcuts for video control
+- Activity logging for playback events
+- Professional email alert design
+- Fixed SPF alignment for email delivery
+- Email alerts to multiple addresses
+
+### v1.1.0 (2026-03-13)
+- Added Multi-Factor Authentication (TOTP)
+- Added fail2ban-style rate limiting
+- Activity logging system
+- Email alerts for security events
+- Secure logout functionality
+- Enhanced security measures
 
 ### v1.0.0 (2026-01-15)
 - Initial release
-- Folder navigation and file browsing
-- Streaming downloads for large files
-- HTTP Basic Authentication with session timeout
-- Client-side filtering and search
+- Folder navigation
+- Byte level streaming downloads
+- HTTP Basic Authentication
+- Search and filter
 - Mobile responsive design
-- Security hardening (directory traversal protection)
-- Session caching for B2 auth tokens
 
 ---
 
-**⚠️ Security Notice:** 
-- Never expose B2 credentials in public repositories
-- Always use environment variables or external configuration files for sensitive data
-- Enable MFA for production deployments handling sensitive camera footage
-- Regularly review failed login attempts in `/tmp/b2_login_attempts.json`
-- Keep your MFA secret backed up in a secure location (password manager, encrypted vault)
+**Security Notice:** 
+- Never commit credentials to version control
+- Always use HTTPS in production
+- Enable MFA for sensitive camera footage
+- Regularly review activity logs
+- Keep MFA secret backed up securely
+
+**Made with ❤️ for secure home camera systems**
