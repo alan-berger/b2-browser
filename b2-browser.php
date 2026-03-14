@@ -1,6 +1,7 @@
 <?php
 /**
  * Backblaze B2 Private Bucket File Browser
+ * Version 1.2.0 - With Activity Logging and Email Alerts
  * 
  * Configuration Instructions:
  * 1. Fill in your B2 credentials below
@@ -11,10 +12,18 @@
 // ============================================
 // CONFIGURATION - FILL THESE IN
 // ============================================
+
+// Backblaze B2 Credentials
 define('B2_KEY_ID', 'your_application_key_id');
 define('B2_APPLICATION_KEY', 'your_application_key');
 define('B2_BUCKET_NAME', 'your_bucket_name');
 define('B2_BUCKET_ID', 'your_bucket_id');
+
+// Your Domain and Contact Information
+define('YOUR_DOMAIN', 'yourdomain.com');           // Your domain (without https://)
+define('YOUR_HOMEPAGE', 'https://yourdomain.com'); // Full URL to your homepage
+define('ADMIN_EMAIL', 'admin@yourdomain.com');     // Primary admin email (used for Reply-To)
+define('ALERT_EMAILS', 'admin@yourdomain.com,backup@yourdomain.com'); // Comma-separated list of emails to receive alerts
 
 // Optional: Add basic authentication for extra security
 define('AUTH_USERNAME', ''); // Leave empty to disable
@@ -26,10 +35,21 @@ define('MAX_LOGIN_ATTEMPTS', 5); // Maximum failed attempts
 define('LOCKOUT_DURATION', 900); // Lockout time in seconds (15 minutes)
 define('ATTEMPT_WINDOW', 300); // Time window to track attempts (5 minutes)
 
-// Multi-Factor Authentication (TOTP)
+// Multi-Factor Authentication (TOTP) - Optional but highly recommended
 define('MFA_ENABLED', false); // Set to true to enable MFA
-define('MFA_SECRET', ''); // Generate using generateMFASecret() function
-define('MFA_ISSUER', 'B2 File Browser'); // Name shown in authenticator app
+define('MFA_SECRET', ''); // Generate using instructions below
+define('MFA_ISSUER', 'B2 File Browser');
+
+// Activity Logging and Email Alerts
+define('LOG_ENABLED', true);
+define('LOG_FILE_PATH', '/path/to/activity.log');	// Your path for the activity.log
+define('EMAIL_ALERTS_ENABLED', true);
+// ALERT_EMAILS is now defined above with YOUR_DOMAIN and ADMIN_EMAIL
+define('ALERT_ON_LOGIN', true);           // Email on successful login
+define('ALERT_ON_FAILED_LOGIN', true);    // Email after 3 failed attempts
+define('ALERT_ON_LOCKOUT', true);         // Email on account lockout
+define('ALERT_ON_DOWNLOADS', false);      // Email on file downloads (can be noisy)
+define('ALERT_ON_PLAYBACK', false);       // Email on video playback (can be noisy)
 
 // Session timeout in seconds (default: 30 minutes)
 define('SESSION_TIMEOUT', 1800);
@@ -51,17 +71,23 @@ if (defined('AUTH_USERNAME') && defined('AUTH_PASSWORD') && AUTH_USERNAME !== ''
     
     // Handle logout request
     if (isset($_GET['logout'])) {
+        // Log logout event
+        logActivity('LOGOUT', [
+            'username' => $_SESSION['username'] ?? 'Unknown'
+        ]);
+        
         session_unset();
         session_destroy();
         
-        // Clear HTTP Basic Auth by sending 401
-        header('WWW-Authenticate: Basic realm="B2 File Browser"');
-        header('HTTP/1.0 401 Unauthorized');
-        echo '<html><body style="font-family: Arial, sans-serif; padding: 40px; text-align: center;">';
+        // Don't send 401 - just show logout message and redirect
+        echo '<!DOCTYPE html><html><head><meta charset="UTF-8">';
+        echo '<meta http-equiv="refresh" content="2;url=' . YOUR_HOMEPAGE . '" />';
+        echo '<title>Logged Out</title></head>';
+        echo '<body style="font-family: Arial, sans-serif; padding: 40px; text-align: center;">';
         echo '<h1 style="color: #2ecc71;">✅ Logged Out Successfully</h1>';
         echo '<p style="font-size: 16px;">You have been logged out.</p>';
-        echo '<p style="font-size: 14px; color: #666;">Close your browser to complete the logout process.</p>';
-        echo '<p style="margin-top: 20px;"><a href="?" style="color: #3498db; text-decoration: none;">← Return to Login</a></p>';
+        echo '<p style="font-size: 14px; color: #666;">Redirecting to homepage in 2 seconds...</p>';
+        echo '<p style="margin-top: 20px;"><a href="' . YOUR_HOMEPAGE . '" style="color: #3498db; text-decoration: none;">← Return to Homepage Now</a></p>';
         echo '</body></html>';
         exit;
     }
@@ -77,6 +103,33 @@ if (defined('AUTH_USERNAME') && defined('AUTH_PASSWORD') && AUTH_USERNAME !== ''
     
     if (!$rateLimitCheck['allowed']) {
         $minutes = ceil($rateLimitCheck['remaining'] / 60);
+        
+        // Log lockout event
+        logActivity('ACCOUNT_LOCKED', [
+            'reason' => 'Too many failed login attempts',
+            'attempts' => $rateLimitCheck['attempts'],
+            'lockout_duration' => $minutes . ' minutes'
+        ]);
+        
+        // Send email alert
+        if (ALERT_ON_LOCKOUT) {
+            $message = "
+            <div class='alert-box alert-danger'>
+                <p class='alert-title'>⚠️ Account Lockout Detected</p>
+                <p>Your camera system has temporarily locked an IP address due to multiple failed login attempts.</p>
+            </div>
+            <table>
+                <tr><th>IP Address</th><td>{$clientIP}</td></tr>
+                <tr><th>Failed Attempts</th><td>{$rateLimitCheck['attempts']} / " . MAX_LOGIN_ATTEMPTS . "</td></tr>
+                <tr><th>Lockout Duration</th><td>{$minutes} minutes</td></tr>
+                <tr><th>Event Time</th><td class='timestamp'>" . date('Y-m-d H:i:s T') . "</td></tr>
+            </table>
+            <p><strong>⚡ Action Required:</strong> If this was not you or an authorized user, someone may be attempting unauthorized access to your camera footage.</p>
+            <p>The IP address has been automatically blocked and will be able to retry after the lockout period expires.</p>
+            ";
+            sendEmailAlert('🔒 Security Alert: Account Locked', $message);
+        }
+        
         header('HTTP/1.0 429 Too Many Requests');
         echo '<html><body style="font-family: Arial, sans-serif; padding: 40px; text-align: center;">';
         echo '<h1 style="color: #e74c3c;">🔒 Account Temporarily Locked</h1>';
@@ -135,6 +188,35 @@ if (defined('AUTH_USERNAME') && defined('AUTH_PASSWORD') && AUTH_USERNAME !== ''
             } else {
                 // Wrong username or password - record failed attempt
                 recordFailedAttempt($clientIP);
+                
+                // Log failed attempt
+                logActivity('LOGIN_FAILED', [
+                    'reason' => 'Invalid credentials',
+                    'username_attempt' => $_SERVER['PHP_AUTH_USER']
+                ]);
+                
+                // Check if we should send email alert (after 3 failed attempts)
+                $attemptsFile = sys_get_temp_dir() . '/b2_login_attempts.json';
+                if (file_exists($attemptsFile)) {
+                    $attempts = json_decode(file_get_contents($attemptsFile), true) ?: [];
+                    if (isset($attempts[$clientIP]) && $attempts[$clientIP]['count'] >= 3 && ALERT_ON_FAILED_LOGIN) {
+                        $message = "
+                        <div class='alert-box alert-warning'>
+                            <p class='alert-title'>⚠️ Multiple Failed Login Attempts</p>
+                            <p>Your camera system has detected multiple unsuccessful login attempts from the same IP address.</p>
+                        </div>
+                        <table>
+                            <tr><th>IP Address</th><td>{$clientIP}</td></tr>
+                            <tr><th>Failed Attempts</th><td>{$attempts[$clientIP]['count']}</td></tr>
+                            <tr><th>Username Attempted</th><td>" . htmlspecialchars($_SERVER['PHP_AUTH_USER']) . "</td></tr>
+                            <tr><th>Event Time</th><td class='timestamp'>" . date('Y-m-d H:i:s T') . "</td></tr>
+                        </table>
+                        <p><strong>Note:</strong> The account will be automatically locked after " . MAX_LOGIN_ATTEMPTS . " failed attempts (" . (MAX_LOGIN_ATTEMPTS - $attempts[$clientIP]['count']) . " attempts remaining).</p>
+                        <p>If you recognize this activity, you can ignore this message. If not, someone may be attempting to gain unauthorized access.</p>
+                        ";
+                        sendEmailAlert('⚠️ Security Alert: Failed Login Attempts', $message);
+                    }
+                }
             }
         }
         
@@ -142,7 +224,11 @@ if (defined('AUTH_USERNAME') && defined('AUTH_PASSWORD') && AUTH_USERNAME !== ''
         if (!$credentialsValid) {
             header('WWW-Authenticate: Basic realm="B2 File Browser"');
             header('HTTP/1.0 401 Unauthorized');
-            echo 'Authentication required';
+            echo '<html><body style="font-family: Arial, sans-serif; padding: 40px; text-align: center;">';
+            echo '<h1>Authentication Required</h1>';
+            echo '<p>You must log in to access this page.</p>';
+            echo '<p style="margin-top: 20px;"><a href="' . YOUR_HOMEPAGE . '" style="color: #3498db; text-decoration: none;">← Return to Homepage</a></p>';
+            echo '</body></html>';
             exit;
         }
         
@@ -158,12 +244,48 @@ if (defined('AUTH_USERNAME') && defined('AUTH_PASSWORD') && AUTH_USERNAME !== ''
                     $_SESSION['username'] = AUTH_USERNAME;
                     clearFailedAttempts($clientIP);
                     
+                    // Log successful login
+                    logActivity('LOGIN_SUCCESS', [
+                        'method' => 'HTTP Basic Auth + MFA',
+                        'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown'
+                    ]);
+                    
+                    // Send email alert
+                    if (ALERT_ON_LOGIN) {
+                        $message = "
+                        <div class='alert-box alert-success'>
+                            <p class='alert-title'>✅ Successful Login</p>
+                            <p>A user has successfully authenticated and accessed your camera monitoring system.</p>
+                        </div>
+                        <table>
+                            <tr><th>Username</th><td>" . htmlspecialchars(AUTH_USERNAME) . "</td></tr>
+                            <tr><th>IP Address</th><td>{$clientIP}</td></tr>
+                            <tr><th>Authentication Method</th><td>HTTP Basic Auth + Two-Factor (TOTP)</td></tr>
+                            <tr><th>Login Time</th><td class='timestamp'>" . date('Y-m-d H:i:s T') . "</td></tr>
+                            <tr><th>Browser/Device</th><td>" . htmlspecialchars(substr($_SERVER['HTTP_USER_AGENT'] ?? 'Unknown', 0, 100)) . "</td></tr>
+                        </table>
+                        <p>If this login was authorized, no action is needed. If you don't recognize this activity, please secure your account immediately:</p>
+                        <ul>
+                            <li>Change your password</li>
+                            <li>Review recent access logs</li>
+                            <li>Check your MFA device for unauthorized access</li>
+                        </ul>
+                        ";
+                        sendEmailAlert('✅ Login Notification: Camera System Access', $message);
+                    }
+                    
                     // Redirect to remove POST data
                     header('Location: ' . strtok($_SERVER['REQUEST_URI'], '?'));
                     exit;
                 } else {
                     // Invalid MFA code
                     recordFailedAttempt($clientIP);
+                    
+                    // Log MFA failure
+                    logActivity('MFA_FAILED', [
+                        'reason' => 'Invalid TOTP code'
+                    ]);
+                    
                     $mfaError = 'Invalid authentication code. Please try again.';
                 }
             }
@@ -206,6 +328,34 @@ if (defined('AUTH_USERNAME') && defined('AUTH_PASSWORD') && AUTH_USERNAME !== ''
             $_SESSION['last_activity'] = time();
             $_SESSION['username'] = AUTH_USERNAME;
             clearFailedAttempts($clientIP);
+            
+            // Log successful login (no MFA)
+            logActivity('LOGIN_SUCCESS', [
+                'method' => 'HTTP Basic Auth (no MFA)',
+                'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown'
+            ]);
+            
+            // Send email alert
+            if (ALERT_ON_LOGIN) {
+                $message = "
+                <div class='alert-box alert-success'>
+                    <p class='alert-title'>✅ Successful Login</p>
+                    <p>A user has successfully authenticated and accessed your camera monitoring system.</p>
+                </div>
+                <table>
+                    <tr><th>Username</th><td>" . htmlspecialchars(AUTH_USERNAME) . "</td></tr>
+                    <tr><th>IP Address</th><td>{$clientIP}</td></tr>
+                    <tr><th>Authentication Method</th><td>HTTP Basic Auth Only</td></tr>
+                    <tr><th>Login Time</th><td class='timestamp'>" . date('Y-m-d H:i:s T') . "</td></tr>
+                    <tr><th>Browser/Device</th><td>" . htmlspecialchars(substr($_SERVER['HTTP_USER_AGENT'] ?? 'Unknown', 0, 100)) . "</td></tr>
+                </table>
+                <div class='alert-box alert-warning'>
+                    <p class='alert-title'>🔐 Security Recommendation</p>
+                    <p>Consider enabling Multi-Factor Authentication (MFA) for enhanced security. MFA adds an additional layer of protection by requiring a time-based code from your phone.</p>
+                </div>
+                ";
+                sendEmailAlert('✅ Login Notification: Camera System Access', $message);
+            }
         }
     } else {
         // Update last activity time
@@ -367,6 +517,247 @@ class B2Api {
 }
 
 // ============================================
+// HELPER FUNCTIONS
+// ============================================
+function formatFileSize($bytes) {
+    if ($bytes >= 1073741824) {
+        return number_format($bytes / 1073741824, 2) . ' GB';
+    } elseif ($bytes >= 1048576) {
+        return number_format($bytes / 1048576, 2) . ' MB';
+    } elseif ($bytes >= 1024) {
+        return number_format($bytes / 1024, 2) . ' KB';
+    }
+    return $bytes . ' B';
+}
+
+function parseFilePath($filePath) {
+    $parts = explode('/', $filePath);
+    $info = [
+        'camera' => '',
+        'year' => '',
+        'month' => '',
+        'day' => '',
+        'cameraId' => '',
+        'fileName' => '',
+        'type' => ''
+    ];
+    
+    if (count($parts) >= 6) {
+        $info['camera'] = $parts[0];
+        $info['year'] = $parts[1];
+        $info['month'] = $parts[2];
+        $info['day'] = $parts[3];
+        $info['cameraId'] = $parts[4];
+        $info['fileName'] = end($parts);
+        $info['type'] = pathinfo($info['fileName'], PATHINFO_EXTENSION);
+    }
+    
+    return $info;
+}
+
+// ============================================
+// ACTIVITY LOGGING AND EMAIL ALERTS
+// ============================================
+function logActivity($event, $details = []) {
+    if (!LOG_ENABLED) {
+        return;
+    }
+    
+    $timestamp = date('Y-m-d H:i:s');
+    $ip = getClientIP();
+    $username = isset($_SESSION['username']) ? $_SESSION['username'] : 'N/A';
+    
+    $logEntry = [
+        'timestamp' => $timestamp,
+        'event' => $event,
+        'username' => $username,
+        'ip' => $ip,
+        'details' => $details
+    ];
+    
+    $logLine = json_encode($logEntry) . "\n";
+    
+    // Ensure log directory exists
+    $logDir = dirname(LOG_FILE_PATH);
+    if (!file_exists($logDir)) {
+        @mkdir($logDir, 0755, true);
+    }
+    
+    // Write to log file
+    @file_put_contents(LOG_FILE_PATH, $logLine, FILE_APPEND | LOCK_EX);
+    
+    // Rotate log if it gets too large (> 10MB)
+    if (file_exists(LOG_FILE_PATH) && filesize(LOG_FILE_PATH) > 10485760) {
+        @rename(LOG_FILE_PATH, LOG_FILE_PATH . '.' . date('Y-m-d-His') . '.old');
+    }
+}
+
+function sendEmailAlert($subject, $message) {
+    if (!EMAIL_ALERTS_ENABLED) {
+        return;
+    }
+    
+    $emails = array_map('trim', explode(',', ALERT_EMAILS));
+    
+    // Use proper domain for sender
+    $fromEmail = 'alerts@' . YOUR_DOMAIN;
+    $fromName = 'Camera Security System';
+    
+    $headers = [
+        'From: ' . $fromName . ' <' . $fromEmail . '>',
+        'Reply-To: ' . ADMIN_EMAIL,
+        'X-Mailer: PHP/' . phpversion(),
+        'MIME-Version: 1.0',
+        'Content-Type: text/html; charset=UTF-8',
+        'X-Priority: 1',
+        'Importance: High',
+        'Message-ID: <' . time() . '.' . md5($subject . microtime()) . '@' . YOUR_DOMAIN . '>'
+    ];
+    
+    $htmlMessage = "
+    <!DOCTYPE html>
+    <html lang='en'>
+    <head>
+        <meta charset='UTF-8'>
+        <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+        <title>" . htmlspecialchars($subject) . "</title>
+        <style>
+            body { 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                line-height: 1.6; 
+                color: #333;
+                margin: 0;
+                padding: 0;
+                background-color: #f4f4f4;
+            }
+            .email-wrapper {
+                max-width: 600px;
+                margin: 20px auto;
+                background: #ffffff;
+            }
+            .header { 
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: #fff; 
+                padding: 30px 20px;
+                text-align: center;
+            }
+            .header h1 {
+                margin: 0;
+                font-size: 24px;
+                font-weight: 600;
+            }
+            .content { 
+                background: #ffffff;
+                padding: 30px 20px;
+            }
+            .alert-box {
+                padding: 20px;
+                border-radius: 8px;
+                margin: 20px 0;
+            }
+            .alert-success { 
+                background: #d4edda;
+                border-left: 4px solid #28a745;
+                color: #155724;
+            }
+            .alert-warning { 
+                background: #fff3cd;
+                border-left: 4px solid #ffc107;
+                color: #856404;
+            }
+            .alert-danger { 
+                background: #f8d7da;
+                border-left: 4px solid #dc3545;
+                color: #721c24;
+            }
+            .alert-title {
+                font-size: 18px;
+                font-weight: 600;
+                margin: 0 0 10px 0;
+            }
+            table { 
+                width: 100%; 
+                margin: 20px 0;
+                border-collapse: collapse;
+                background: #fff;
+            }
+            th { 
+                text-align: left; 
+                padding: 12px;
+                background: #f8f9fa;
+                color: #495057;
+                font-weight: 600;
+                border-bottom: 2px solid #dee2e6;
+            }
+            td { 
+                padding: 12px;
+                border-bottom: 1px solid #dee2e6;
+                color: #212529;
+            }
+            tr:last-child td {
+                border-bottom: none;
+            }
+            .footer { 
+                background: #f8f9fa;
+                padding: 20px;
+                text-align: center;
+                font-size: 12px;
+                color: #6c757d;
+                border-top: 1px solid #dee2e6;
+            }
+            .footer p {
+                margin: 5px 0;
+            }
+            .button {
+                display: inline-block;
+                padding: 12px 24px;
+                background: #667eea;
+                color: #ffffff !important;
+                text-decoration: none;
+                border-radius: 6px;
+                margin: 20px 0;
+                font-weight: 600;
+            }
+            .timestamp {
+                font-family: 'Courier New', monospace;
+                background: #f8f9fa;
+                padding: 2px 6px;
+                border-radius: 3px;
+                font-size: 13px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class='email-wrapper'>
+            <div class='header'>
+                <h1>🎥 Camera Security Alert</h1>
+            </div>
+            <div class='content'>
+                {$message}
+            </div>
+            <div class='footer'>
+                <p><strong>Camera Backup System</strong></p>
+                <p>This is an automated security notification from your camera monitoring system</p>
+                <p>System: " . YOUR_DOMAIN . " | Time: " . date('l, F j, Y \a\t g:i A T') . "</p>
+                <p style='margin-top: 15px; font-size: 11px; color: #999;'>
+                    If you did not expect this email, please contact the system administrator immediately.
+                </p>
+            </div>
+        </div>
+    </body>
+    </html>
+    ";
+    
+    // Plain text alternative for better deliverability
+    $plainMessage = strip_tags(str_replace(['<br>', '<p>', '</p>'], ["\n", "\n", "\n"], $message));
+    
+    foreach ($emails as $email) {
+        // Set envelope sender to match From address for SPF alignment
+        @mail($email, $subject, $htmlMessage, implode("\r\n", $headers), '-f ' . $fromEmail);
+    }
+}
+
+// ============================================
 // RATE LIMITING FUNCTIONS
 // ============================================
 function getClientIP() {
@@ -398,12 +789,19 @@ function checkRateLimit($ip) {
     }
     
     $now = time();
+    $cleaned = false;
     
     // Clean old attempts
     foreach ($attempts as $key => $data) {
         if ($now - $data['first_attempt'] > ATTEMPT_WINDOW) {
             unset($attempts[$key]);
+            $cleaned = true;
         }
+    }
+    
+    // Only save if we cleaned something
+    if ($cleaned) {
+        file_put_contents($attemptsFile, json_encode($attempts));
     }
     
     // Check if IP is locked out
@@ -424,6 +822,7 @@ function checkRateLimit($ip) {
         // Reset if lockout expired
         if (isset($ipData['locked_until']) && $now >= $ipData['locked_until']) {
             unset($attempts[$ip]);
+            file_put_contents($attemptsFile, json_encode($attempts));
         }
     }
     
@@ -572,45 +971,6 @@ function getMFAQRCode($secret, $username) {
 }
 
 // ============================================
-// HELPER FUNCTIONS
-// ============================================
-function formatFileSize($bytes) {
-    if ($bytes >= 1073741824) {
-        return number_format($bytes / 1073741824, 2) . ' GB';
-    } elseif ($bytes >= 1048576) {
-        return number_format($bytes / 1048576, 2) . ' MB';
-    } elseif ($bytes >= 1024) {
-        return number_format($bytes / 1024, 2) . ' KB';
-    }
-    return $bytes . ' B';
-}
-
-function parseFilePath($filePath) {
-    $parts = explode('/', $filePath);
-    $info = [
-        'camera' => '',
-        'year' => '',
-        'month' => '',
-        'day' => '',
-        'cameraId' => '',
-        'fileName' => '',
-        'type' => ''
-    ];
-    
-    if (count($parts) >= 6) {
-        $info['camera'] = $parts[0];
-        $info['year'] = $parts[1];
-        $info['month'] = $parts[2];
-        $info['day'] = $parts[3];
-        $info['cameraId'] = $parts[4];
-        $info['fileName'] = end($parts);
-        $info['type'] = pathinfo($info['fileName'], PATHINFO_EXTENSION);
-    }
-    
-    return $info;
-}
-
-// ============================================
 // MAIN APPLICATION LOGIC
 // ============================================
 
@@ -634,7 +994,7 @@ if (!$configError) {
     try {
         $b2 = new B2Api();
         
-        // Handle download request
+        // Handle file retrieval request
         if (isset($_GET['download'])) {
             $fileName = $_GET['download'];
             
@@ -643,53 +1003,83 @@ if (!$configError) {
                 die('Invalid file path');
             }
             
+            // Log download event
+            logActivity('FILE_DOWNLOAD', [
+                'filename' => $fileName,
+                'filesize' => 'Unknown'
+            ]);
+            
+            // Send email alert if enabled
+            if (ALERT_ON_DOWNLOADS) {
+                $message = "
+                <div class='alert-box alert-success'>
+                    <p class='alert-title'>📥 File Downloaded</p>
+                    <p>A user has downloaded a file from your camera backup system.</p>
+                </div>
+                <table>
+                    <tr><th>Username</th><td>" . htmlspecialchars($_SESSION['username'] ?? 'Unknown') . "</td></tr>
+                    <tr><th>IP Address</th><td>" . getClientIP() . "</td></tr>
+                    <tr><th>Filename</th><td>" . htmlspecialchars(basename($fileName)) . "</td></tr>
+                    <tr><th>Camera/Date Path</th><td>" . htmlspecialchars($fileName) . "</td></tr>
+                    <tr><th>Download Time</th><td class='timestamp'>" . date('Y-m-d H:i:s T') . "</td></tr>
+                </table>
+                <p>This file has been successfully retrieved from your backup storage. If this download was not authorized, please review your access controls.</p>
+                ";
+                sendEmailAlert('📥 Download Notification: File Retrieved', $message);
+            }
+            
             $downloadUrl = $b2->getDownloadUrl($fileName);
             
-            // Stream the file directly instead of loading into memory
+            // Initialize file transfer
             $ch = curl_init($downloadUrl);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                'Authorization: ' . $b2->getAuthToken()
-            ]);
-            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-            curl_setopt($ch, CURLOPT_HEADER, false);
-            curl_setopt($ch, CURLOPT_NOBODY, true); // Get headers only first
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+            $curlOptions = [
+                CURLOPT_HTTPHEADER => ['Authorization: ' . $b2->getAuthToken()],
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_HEADER => false,
+                CURLOPT_NOBODY => true,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 30,
+                CURLOPT_CONNECTTIMEOUT => 10
+            ];
+            curl_setopt_array($ch, $curlOptions);
             
-            // Get headers to determine content type and size
+            // Retrieve metadata
             curl_exec($ch);
             $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
             $contentLength = curl_getinfo($ch, CURLINFO_CONTENT_LENGTH_DOWNLOAD);
             curl_close($ch);
             
-            // Set headers for download
-            if ($contentType) {
-                header('Content-Type: ' . $contentType);
-            } else {
-                header('Content-Type: application/octet-stream');
-            }
-            header('Content-Disposition: attachment; filename="' . basename($fileName) . '"');
+            // Prepare response headers
+            $headers = [
+                'Content-Type' => $contentType ?: 'application/octet-stream',
+                'Content-Disposition' => 'attachment; filename="' . basename($fileName) . '"',
+                'Cache-Control' => 'must-revalidate',
+                'Pragma' => 'public',
+                'X-Content-Type-Options' => 'nosniff'
+            ];
+            
             if ($contentLength > 0) {
-                header('Content-Length: ' . $contentLength);
+                $headers['Content-Length'] = $contentLength;
             }
-            header('Cache-Control: must-revalidate');
-            header('Pragma: public');
-            header('X-Content-Type-Options: nosniff'); // Security header
             
-            // Stream the actual file content
+            foreach ($headers as $key => $value) {
+                header($key . ': ' . $value);
+            }
+            
+            // Transfer file content
             $ch = curl_init($downloadUrl);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                'Authorization: ' . $b2->getAuthToken()
-            ]);
-            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-            curl_setopt($ch, CURLOPT_HEADER, false);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, false); // Output directly to browser
-            curl_setopt($ch, CURLOPT_BUFFERSIZE, 8192); // Stream in 8KB chunks
-            curl_setopt($ch, CURLOPT_TIMEOUT, 0); // No timeout for large files
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+            $transferOptions = [
+                CURLOPT_HTTPHEADER => ['Authorization: ' . $b2->getAuthToken()],
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_HEADER => false,
+                CURLOPT_RETURNTRANSFER => false,
+                CURLOPT_BUFFERSIZE => 8192,
+                CURLOPT_TIMEOUT => 0,
+                CURLOPT_CONNECTTIMEOUT => 10
+            ];
+            curl_setopt_array($ch, $transferOptions);
             
-            // Flush output buffer before streaming
+            // Clear output buffer
             if (ob_get_level()) {
                 ob_end_clean();
             }
@@ -698,10 +1088,274 @@ if (!$configError) {
             
             // Check for errors
             if (curl_errno($ch)) {
-                error_log("B2 Download Error: " . curl_error($ch));
+                error_log("B2 File Transfer Error: " . curl_error($ch));
             }
             
             curl_close($ch);
+            exit;
+        }
+        
+        // Handle video streaming proxy
+        if (isset($_GET['stream'])) {
+            $fileName = $_GET['stream'];
+            
+            // Security: Prevent directory traversal attacks
+            if (strpos($fileName, '..') !== false) {
+                die('Invalid file path');
+            }
+            
+            $downloadUrl = $b2->getDownloadUrl($fileName);
+            
+            // Initialize streaming with range support
+            $ch = curl_init($downloadUrl);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Authorization: ' . $b2->getAuthToken()
+            ]);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_HEADER, true);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_NOBODY, true);
+            
+            // Get file info
+            curl_exec($ch);
+            $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+            $contentLength = curl_getinfo($ch, CURLINFO_CONTENT_LENGTH_DOWNLOAD);
+            curl_close($ch);
+            
+            // Handle range requests for seeking
+            $rangeHeader = '';
+            if (isset($_SERVER['HTTP_RANGE'])) {
+                $rangeHeader = $_SERVER['HTTP_RANGE'];
+            }
+            
+            // Stream the video
+            $ch = curl_init($downloadUrl);
+            $headers = ['Authorization: ' . $b2->getAuthToken()];
+            
+            if ($rangeHeader) {
+                $headers[] = 'Range: ' . $rangeHeader;
+                curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+                
+                // Parse range
+                preg_match('/bytes=(\d+)-(\d*)/', $rangeHeader, $matches);
+                $start = $matches[1];
+                $end = $matches[2] ?: ($contentLength - 1);
+                
+                header('HTTP/1.1 206 Partial Content');
+                header('Content-Range: bytes ' . $start . '-' . $end . '/' . $contentLength);
+                header('Content-Length: ' . ($end - $start + 1));
+            } else {
+                curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+                header('HTTP/1.1 200 OK');
+                header('Content-Length: ' . $contentLength);
+            }
+            
+            header('Content-Type: ' . ($contentType ?: 'video/mp4'));
+            header('Accept-Ranges: bytes');
+            header('Cache-Control: public, max-age=3600');
+            
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_HEADER, false);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, false);
+            curl_setopt($ch, CURLOPT_BUFFERSIZE, 8192);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 0);
+            
+            // Clear output buffer
+            if (ob_get_level()) {
+                ob_end_clean();
+            }
+            
+            curl_exec($ch);
+            curl_close($ch);
+            exit;
+        }
+        
+        // Handle video playback request
+        if (isset($_GET['play'])) {
+            $fileName = $_GET['play'];
+            
+            // Security: Prevent directory traversal attacks
+            if (strpos($fileName, '..') !== false) {
+                die('Invalid file path');
+            }
+            
+            // Log playback event
+            logActivity('VIDEO_PLAYBACK', [
+                'filename' => $fileName
+            ]);
+            
+            // Send email alert if enabled
+            if (ALERT_ON_PLAYBACK) {
+                $message = "
+                <div class='alert-box alert-success'>
+                    <p class='alert-title'>▶️ Video Playback Started</p>
+                    <p>A user has started playing a video from your camera backup system.</p>
+                </div>
+                <table>
+                    <tr><th>Username</th><td>" . htmlspecialchars($_SESSION['username'] ?? 'Unknown') . "</td></tr>
+                    <tr><th>IP Address</th><td>" . getClientIP() . "</td></tr>
+                    <tr><th>Filename</th><td>" . htmlspecialchars(basename($fileName)) . "</td></tr>
+                    <tr><th>Camera/Date Path</th><td>" . htmlspecialchars($fileName) . "</td></tr>
+                    <tr><th>Playback Time</th><td class='timestamp'>" . date('Y-m-d H:i:s T') . "</td></tr>
+                </table>
+                <p>The video is being streamed directly in the browser. If this playback was not authorized, please review your access controls.</p>
+                ";
+                sendEmailAlert('▶️ Playback Notification: Video Streaming', $message);
+            }
+            
+            $downloadUrl = $b2->getDownloadUrl($fileName);
+            $fileInfo = parseFilePath($fileName);
+            
+            // Display video player page
+            echo '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">';
+            echo '<meta name="viewport" content="width=device-width, initial-scale=1.0">';
+            echo '<title>Video Player - ' . htmlspecialchars(basename($fileName)) . '</title>';
+            echo '<style>
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body {
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                    background: #000;
+                    color: #fff;
+                    display: flex;
+                    flex-direction: column;
+                    min-height: 100vh;
+                }
+                .header {
+                    background: #1a1a1a;
+                    padding: 15px 20px;
+                    border-bottom: 1px solid #333;
+                }
+                .header h1 {
+                    font-size: 18px;
+                    font-weight: 500;
+                    color: #fff;
+                }
+                .video-container {
+                    flex: 1;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 20px;
+                    background: #000;
+                }
+                video {
+                    max-width: 100%;
+                    max-height: calc(100vh - 200px);
+                    width: auto;
+                    height: auto;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+                }
+                .controls {
+                    background: #1a1a1a;
+                    padding: 20px;
+                    text-align: center;
+                    border-top: 1px solid #333;
+                }
+                .btn {
+                    display: inline-block;
+                    padding: 12px 24px;
+                    margin: 5px;
+                    background: #3498db;
+                    color: #fff;
+                    text-decoration: none;
+                    border-radius: 6px;
+                    font-size: 14px;
+                    transition: background 0.2s;
+                }
+                .btn:hover {
+                    background: #2980b9;
+                }
+                .btn-secondary {
+                    background: #95a5a6;
+                }
+                .btn-secondary:hover {
+                    background: #7f8c8d;
+                }
+                .info {
+                    background: #2c2c2c;
+                    padding: 15px 20px;
+                    font-size: 13px;
+                    color: #999;
+                }
+                .info-item {
+                    display: inline-block;
+                    margin-right: 20px;
+                    margin-bottom: 5px;
+                }
+                .info-label {
+                    color: #666;
+                    margin-right: 5px;
+                }
+                @media (max-width: 768px) {
+                    video {
+                        max-height: calc(100vh - 250px);
+                    }
+                    .btn {
+                        display: block;
+                        width: 100%;
+                        margin: 5px 0;
+                    }
+                }
+            </style></head><body>';
+            
+            echo '<div class="header">';
+            echo '<h1>🎥 ' . htmlspecialchars(basename($fileName)) . '</h1>';
+            echo '</div>';
+            
+            echo '<div class="video-container">';
+            echo '<video controls autoplay preload="metadata" id="videoPlayer">';
+            echo '<source src="?stream=' . urlencode($fileName) . '" type="video/mp4">';
+            echo 'Your browser does not support the video tag.';
+            echo '</video>';
+            echo '</div>';
+            
+            echo '<div class="info">';
+            if ($fileInfo['year']) {
+                echo '<span class="info-item"><span class="info-label">Date:</span>' . 
+                     $fileInfo['year'] . '-' . $fileInfo['month'] . '-' . $fileInfo['day'] . '</span>';
+            }
+            if ($fileInfo['cameraId']) {
+                echo '<span class="info-item"><span class="info-label">Camera:</span>' . 
+                     htmlspecialchars($fileInfo['cameraId']) . '</span>';
+            }
+            echo '<span class="info-item"><span class="info-label">File:</span>' . 
+                 htmlspecialchars(basename($fileName)) . '</span>';
+            echo '</div>';
+            
+            echo '<div class="controls">';
+            echo '<a href="?download=' . urlencode($fileName) . '" class="btn">⬇️ Download Video</a>';
+            echo '<a href="?" class="btn btn-secondary">← Back to Files</a>';
+            echo '</div>';
+            
+            echo '<script>
+                const video = document.getElementById("videoPlayer");
+                
+                // Add keyboard controls
+                document.addEventListener("keydown", function(e) {
+                    if (e.key === " " || e.key === "k") {
+                        e.preventDefault();
+                        if (video.paused) video.play();
+                        else video.pause();
+                    } else if (e.key === "f") {
+                        if (video.requestFullscreen) video.requestFullscreen();
+                    } else if (e.key === "m") {
+                        video.muted = !video.muted;
+                    } else if (e.key === "ArrowLeft") {
+                        video.currentTime -= 5;
+                    } else if (e.key === "ArrowRight") {
+                        video.currentTime += 5;
+                    }
+                });
+                
+                // Handle playback errors
+                video.addEventListener("error", function(e) {
+                    console.error("Video playback error:", e);
+                    alert("Error playing video. You can try downloading it instead.");
+                });
+            </script>';
+            
+            echo '</body></html>';
             exit;
         }
         
@@ -1140,6 +1794,11 @@ if (!$configError) {
                         
                         <?php if (!$isFolder): ?>
                             <div class="file-actions">
+                                <?php if ($isVideo): ?>
+                                    <a href="?play=<?php echo urlencode($fileName); ?>" class="btn btn-view">
+                                        ▶️ Play
+                                    </a>
+                                <?php endif; ?>
                                 <a href="?download=<?php echo urlencode($fileName); ?>" class="btn btn-download">
                                     ⬇️ Download
                                 </a>
