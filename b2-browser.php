@@ -153,6 +153,21 @@ if (defined('AUTH_USERNAME') && defined('AUTH_PASSWORD') && AUTH_USERNAME !== ''
             $isAuthenticated = false;
         }
     }
+
+    // Safari on iOS does not forward Basic Auth credentials on video sub-requests
+    // (e.g. the ?stream= request made by the <video> element). If the user has a
+    // valid session we allow the stream through without requiring a re-challenge,
+    // and close the session immediately so it doesn't block the output stream.
+    if (isset($_GET['stream'])) {
+        if ($isAuthenticated) {
+            session_write_close(); // Release session lock before streaming
+            // Fall through to the stream handler below
+        } else {
+            // No valid session — reject cleanly without triggering a Basic Auth popup
+            header('HTTP/1.1 403 Forbidden');
+            exit;
+        }
+    }
     
     // Handle MFA setup request
     if (isset($_GET['setup_mfa']) && MFA_ENABLED && !empty(MFA_SECRET)) {
@@ -513,6 +528,46 @@ class B2Api {
     public function getAuthToken() {
         $this->ensureAuth();
         return $this->authToken;
+    }
+
+    /**
+     * Generate a short-lived signed URL using b2_get_download_authorization.
+     * The browser can use it directly in a <video> tag with no Authorization header,
+     * which fixes iOS Safari which cannot forward credentials on video sub-requests.
+     */
+    public function getSignedUrl($fileName, $validDurationSeconds = 3600) {
+        $this->ensureAuth();
+
+        $url  = $this->apiUrl . '/b2api/v2/b2_get_download_authorization';
+        $data = [
+            'bucketId'               => B2_BUCKET_ID,
+            'fileNamePrefix'         => $fileName,
+            'validDurationInSeconds' => $validDurationSeconds,
+        ];
+
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Authorization: ' . $this->authToken,
+            'Content-Type: application/json'
+        ]);
+        curl_setopt($ch, CURLOPT_POST,           true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS,     json_encode($data));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT,        15);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        $result = json_decode($response, true);
+
+        if ($httpCode !== 200 || empty($result['authorizationToken'])) {
+            throw new Exception('B2 signed URL failed (HTTP ' . $httpCode . '): ' . $response);
+        }
+
+        $baseUrl = $this->downloadUrl . '/file/' . B2_BUCKET_NAME . '/' . $fileName;
+        return $baseUrl . '?Authorization=' . urlencode($result['authorizationToken']);
     }
 }
 
@@ -1105,66 +1160,93 @@ if (!$configError) {
             }
             
             $downloadUrl = $b2->getDownloadUrl($fileName);
-            
-            // Initialize streaming with range support
+            $authToken  = $b2->getAuthToken();
+
+            // -------------------------------------------------------
+            // Step 1: HEAD request to get Content-Length and Content-Type
+            // Safari (iOS) requires accurate Content-Length in every
+            // 206 response before it will begin playback.
+            // -------------------------------------------------------
             $ch = curl_init($downloadUrl);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                'Authorization: ' . $b2->getAuthToken()
-            ]);
-            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-            curl_setopt($ch, CURLOPT_HEADER, true);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_NOBODY, true);
-            
-            // Get file info
-            curl_exec($ch);
-            $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
-            $contentLength = curl_getinfo($ch, CURLINFO_CONTENT_LENGTH_DOWNLOAD);
+            curl_setopt($ch, CURLOPT_HTTPHEADER,     ['Authorization: ' . $authToken]);
+            curl_setopt($ch, CURLOPT_NOBODY,          true);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION,  true);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER,  true);
+            curl_setopt($ch, CURLOPT_HEADER,          true);
+            curl_setopt($ch, CURLOPT_TIMEOUT,         15);
+            $headResponse = curl_exec($ch);
+            $contentType  = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+            $contentLength = (int) curl_getinfo($ch, CURLINFO_CONTENT_LENGTH_DOWNLOAD);
             curl_close($ch);
-            
-            // Handle range requests for seeking
-            $rangeHeader = '';
-            if (isset($_SERVER['HTTP_RANGE'])) {
-                $rangeHeader = $_SERVER['HTTP_RANGE'];
+
+            // Fallback: parse Content-Length from raw HEAD headers if cURL returned -1
+            if ($contentLength <= 0 && preg_match('/Content-Length:\s*(\d+)/i', $headResponse, $m)) {
+                $contentLength = (int) $m[1];
             }
-            
-            // Stream the video
+
+            // Normalise content type
+            if (empty($contentType) || strpos($contentType, 'octet-stream') !== false) {
+                $contentType = 'video/mp4';
+            }
+
+            // -------------------------------------------------------
+            // Step 2: Parse the client's Range header (if any).
+            // Safari always sends Range on first load; we must honour it.
+            // -------------------------------------------------------
+            $rangeHeader = isset($_SERVER['HTTP_RANGE']) ? trim($_SERVER['HTTP_RANGE']) : '';
+            $start = 0;
+            $end   = $contentLength > 0 ? $contentLength - 1 : 0;
+            $isRangeRequest = false;
+
+            if ($rangeHeader && preg_match('/bytes=(\d*)-(\d*)/i', $rangeHeader, $matches)) {
+                $isRangeRequest = true;
+                $start = ($matches[1] !== '') ? (int)$matches[1] : 0;
+                $end   = ($matches[2] !== '') ? (int)$matches[2] : ($contentLength > 0 ? $contentLength - 1 : 0);
+
+                // Clamp end to actual file size
+                if ($contentLength > 0 && $end >= $contentLength) {
+                    $end = $contentLength - 1;
+                }
+            }
+
+            $chunkLength = ($end - $start + 1);
+
+            // -------------------------------------------------------
+            // Step 3: Stream from B2, forwarding the Range header so
+            // B2 only sends the bytes we need (saves bandwidth).
+            // -------------------------------------------------------
             $ch = curl_init($downloadUrl);
-            $headers = ['Authorization: ' . $b2->getAuthToken()];
-            
-            if ($rangeHeader) {
-                $headers[] = 'Range: ' . $rangeHeader;
-                curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-                
-                // Parse range
-                preg_match('/bytes=(\d+)-(\d*)/', $rangeHeader, $matches);
-                $start = $matches[1];
-                $end = $matches[2] ?: ($contentLength - 1);
-                
-                header('HTTP/1.1 206 Partial Content');
-                header('Content-Range: bytes ' . $start . '-' . $end . '/' . $contentLength);
-                header('Content-Length: ' . ($end - $start + 1));
-            } else {
-                curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-                header('HTTP/1.1 200 OK');
-                header('Content-Length: ' . $contentLength);
+            $reqHeaders = ['Authorization: ' . $authToken];
+            if ($isRangeRequest) {
+                $reqHeaders[] = 'Range: bytes=' . $start . '-' . $end;
             }
-            
-            header('Content-Type: ' . ($contentType ?: 'video/mp4'));
-            header('Accept-Ranges: bytes');
-            header('Cache-Control: public, max-age=3600');
-            
+            curl_setopt($ch, CURLOPT_HTTPHEADER,    $reqHeaders);
             curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-            curl_setopt($ch, CURLOPT_HEADER, false);
+            curl_setopt($ch, CURLOPT_HEADER,         false);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, false);
-            curl_setopt($ch, CURLOPT_BUFFERSIZE, 8192);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 0);
-            
-            // Clear output buffer
+            curl_setopt($ch, CURLOPT_BUFFERSIZE,     65536); // 64 KB chunks
+            curl_setopt($ch, CURLOPT_TIMEOUT,        0);
+
+            // -------------------------------------------------------
+            // Step 4: Send correct response headers BEFORE streaming.
+            // 206 Partial Content is required for Safari to seek/play.
+            // -------------------------------------------------------
             if (ob_get_level()) {
                 ob_end_clean();
             }
-            
+
+            if ($isRangeRequest) {
+                header('HTTP/1.1 206 Partial Content');
+                header('Content-Range: bytes ' . $start . '-' . $end . '/' . $contentLength);
+            } else {
+                header('HTTP/1.1 200 OK');
+            }
+
+            header('Content-Type: '   . $contentType);
+            header('Content-Length: ' . $chunkLength);
+            header('Accept-Ranges: bytes');
+            header('Cache-Control: no-cache, no-store'); // Prevent stale range caches
+
             curl_exec($ch);
             curl_close($ch);
             exit;
@@ -1203,7 +1285,11 @@ if (!$configError) {
                 sendEmailAlert('▶️ Playback Notification: Video Streaming', $message);
             }
             
-            $downloadUrl = $b2->getDownloadUrl($fileName);
+            // Generate a short-lived signed URL so the browser's <video> element
+            // can fetch directly from B2's CDN with no PHP proxy in the middle.
+            // This fixes iOS Safari which stalls on large files proxied through PHP,
+            // and also improves performance on all browsers.
+            $signedUrl = $b2->getSignedUrl($fileName, 3600); // valid for 1 hour
             $fileInfo = parseFilePath($fileName);
             
             // Display video player page
@@ -1272,6 +1358,12 @@ if (!$configError) {
                 .btn-secondary:hover {
                     background: #7f8c8d;
                 }
+                .btn-vlc {
+                    background: #e67e22;
+                }
+                .btn-vlc:hover {
+                    background: #d35400;
+                }
                 .info {
                     background: #2c2c2c;
                     padding: 15px 20px;
@@ -1304,8 +1396,8 @@ if (!$configError) {
             echo '</div>';
             
             echo '<div class="video-container">';
-            echo '<video controls autoplay preload="metadata" id="videoPlayer">';
-            echo '<source src="?stream=' . urlencode($fileName) . '" type="video/mp4">';
+            echo '<video controls autoplay muted playsinline preload="metadata" id="videoPlayer">';
+            echo '<source src="' . htmlspecialchars($signedUrl) . '" type="video/mp4">';
             echo 'Your browser does not support the video tag.';
             echo '</video>';
             echo '</div>';
@@ -1323,18 +1415,38 @@ if (!$configError) {
                  htmlspecialchars(basename($fileName)) . '</span>';
             echo '</div>';
             
+            // Detect iOS Safari by user agent
+            $isIOS = preg_match('/iPhone|iPad|iPod/i', $_SERVER['HTTP_USER_AGENT'] ?? '');
+
             echo '<div class="controls">';
+            if ($isIOS) {
+                // On iOS Safari, inline streaming doesn't work for non-faststart MP4s.
+                // Offer an Open in VLC button which streams properly via VLC's media engine.
+                echo '<a href="vlc://' . htmlspecialchars($signedUrl) . '" class="btn btn-vlc">▶️ Open in VLC</a>';
+            }
             echo '<a href="?download=' . urlencode($fileName) . '" class="btn">⬇️ Download Video</a>';
             echo '<a href="?" class="btn btn-secondary">← Back to Files</a>';
             echo '</div>';
             
             echo '<script>
                 const video = document.getElementById("videoPlayer");
+
+                // iOS Safari requires muted autoplay — unmute on first user interaction
+                let userInteracted = false;
+                function unmuteOnInteract() {
+                    if (!userInteracted) {
+                        userInteracted = true;
+                        video.muted = false;
+                    }
+                }
+                video.addEventListener("click",     unmuteOnInteract);
+                video.addEventListener("touchstart", unmuteOnInteract);
                 
                 // Add keyboard controls
                 document.addEventListener("keydown", function(e) {
                     if (e.key === " " || e.key === "k") {
                         e.preventDefault();
+                        unmuteOnInteract();
                         if (video.paused) video.play();
                         else video.pause();
                     } else if (e.key === "f") {
