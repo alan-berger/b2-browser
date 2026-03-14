@@ -469,7 +469,7 @@ class B2Api {
         }
     }
     
-    public function listFiles($prefix = '', $delimiter = '') {
+    public function listFiles($prefix = '', $delimiter = '', $startFileName = '') {
         $this->ensureAuth();
         
         if (defined('DEBUG_MODE') && DEBUG_MODE) {
@@ -482,6 +482,10 @@ class B2Api {
             'prefix' => $prefix,
             'maxFileCount' => FILES_PER_PAGE
         ];
+
+        if ($startFileName !== '') {
+            $data['startFileName'] = $startFileName;
+        }
         
         if ($delimiter !== '') {
             $data['delimiter'] = $delimiter;
@@ -1486,18 +1490,22 @@ if (!$configError) {
             error_log("B2: Current path being queried: '$currentPath'");
         }
         
+        // Pagination: read startFileName from query string
+        $startFileName = isset($_GET['start']) ? $_GET['start'] : '';
+
         // List files with delimiter to get folder structure
-        $result = $b2->listFiles($currentPath, '/');
-        
+        $result = $b2->listFiles($currentPath, '/', $startFileName);
+
         if (defined('DEBUG_MODE') && DEBUG_MODE) {
             error_log("B2: API returned " . count($result['files']) . " files");
             if (isset($result['nextFileName'])) {
                 error_log("B2: More results available (nextFileName set)");
             }
         }
-        
-        $files = isset($result['files']) ? $result['files'] : [];
-        
+
+        $files        = isset($result['files']) ? $result['files'] : [];
+        $nextFileName = isset($result['nextFileName']) ? $result['nextFileName'] : null;
+
         // Sort files: folders first, then by name
         usort($files, function($a, $b) {
             $aIsFolder = substr($a['fileName'], -1) === '/';
@@ -1717,6 +1725,35 @@ if (!$configError) {
             flex-wrap: wrap;
         }
         
+        .pagination {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+            gap: 10px;
+        }
+        .pagination a {
+            display: inline-block;
+            padding: 8px 20px;
+            background: #3498db;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+        .pagination a:hover {
+            background: #2980b9;
+        }
+        .pagination .page-info {
+            font-size: 13px;
+            color: #666;
+        }
+        .pagination .spacer {
+            flex: 1;
+        }
         .filter-bar label {
             font-weight: 500;
             color: #555;
@@ -1920,6 +1957,38 @@ if (!$configError) {
                 <?php endforeach; ?>
             <?php endif; ?>
         </div>
+
+        <?php
+        // Build base URL for pagination links, preserving current path
+        $paginationBase = '?';
+        if ($currentPath !== '') {
+            $paginationBase .= 'path=' . urlencode(rtrim($currentPath, '/')) . '&';
+        }
+        $hasPrev = ($startFileName !== '');
+        $hasNext = ($nextFileName !== null);
+
+        if ($hasPrev || $hasNext):
+        ?>
+        <div class="pagination">
+            <?php if ($hasPrev): ?>
+                <a href="<?php echo $paginationBase; ?>">← First Page</a>
+            <?php else: ?>
+                <span class="spacer"></span>
+            <?php endif; ?>
+
+            <span class="page-info">
+                Showing <?php echo count($files); ?> items
+                <?php if ($hasNext): ?> &mdash; more available<?php endif; ?>
+            </span>
+
+            <?php if ($hasNext): ?>
+                <a href="<?php echo $paginationBase . 'start=' . urlencode($nextFileName); ?>">Next Page →</a>
+            <?php else: ?>
+                <span class="spacer"></span>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
     </div>
     
     <script>
