@@ -1,7 +1,19 @@
 <?php
 /**
  * Backblaze B2 Private Bucket File Browser
- * Version 1.3.1 - TOTP replay store hardened; QR code library replaced
+ * Version 1.4.0 - Content Security Policy; nonce-based script authorisation
+ *
+ * Changes in v1.4.0:
+ *  - Strict Content Security Policy enforced via HTTP headers.
+ *  - Per-request cryptographic nonce (random_bytes) replaces 'unsafe-inline'
+ *    in script-src; all <script> tags carry the nonce attribute.
+ *  - All inline CSS extracted to external b2-browse.css (style-src 'self').
+ *  - All inline event handlers (onclick, onchange, onkeyup, onerror)
+ *    replaced with addEventListener in nonced script blocks.
+ *  - Added CSP directives: form-action, base-uri, frame-ancestors,
+ *    object-src, img-src, media-src.
+ *  - Added X-Content-Type-Options: nosniff header globally.
+ *  - Added Referrer-Policy: no-referrer header.
  *
  * Changes in v1.3.1:
  *  #3  TOTP replay store moved from $_SESSION (per-session) to a shared
@@ -32,7 +44,7 @@
  *  #12 First-time stream 403: ?stream= now also accepts valid Basic Auth
  *      credentials when no session exists.
  */
-
+ 
 // ============================================
 // SECURITY HEADERS
 // ============================================
