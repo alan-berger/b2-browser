@@ -1,0 +1,625 @@
+/**
+ * b2-browse.css — External stylesheet for b2-browse.php
+ * Extracted from inline styles to comply with CSP:
+ *   default-src 'self'; script-src 'self' 'unsafe-inline';
+ *
+ * All inline <style> blocks and style="" attributes have been moved here.
+ */
+
+/* ============================================
+ * STANDALONE MESSAGE PAGES
+ * (logout, rate-limit lockout, 401 auth required)
+ * ============================================ */
+.page-message {
+    font-family: Arial, sans-serif;
+    padding: 40px;
+    text-align: center;
+}
+
+.success-heading {
+    color: #2ecc71;
+}
+
+.danger-heading {
+    color: #e74c3c;
+}
+
+.message-text {
+    font-size: 16px;
+}
+
+.message-text-lg {
+    font-size: 18px;
+}
+
+.message-subtext {
+    font-size: 14px;
+    color: #666;
+}
+
+.message-detail {
+    font-size: 14px;
+    color: #999;
+}
+
+.message-action {
+    margin-top: 20px;
+}
+
+.link-primary {
+    color: #3498db;
+    text-decoration: none;
+}
+
+/* ============================================
+ * MFA SETUP PAGE
+ * ============================================ */
+.mfa-setup-body {
+    font-family: Arial, sans-serif;
+    max-width: 600px;
+    margin: 50px auto;
+    padding: 20px;
+    text-align: center;
+}
+
+.mfa-setup-body h1 {
+    color: #2c3e50;
+}
+
+#qrcode-container {
+    display: inline-block;
+    margin: 20px 0;
+    padding: 12px;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+}
+
+.mfa-setup-body .secret {
+    background: #f5f5f5;
+    padding: 15px;
+    border-radius: 5px;
+    font-family: monospace;
+    font-size: 18px;
+    letter-spacing: 3px;
+    word-break: break-all;
+}
+
+.mfa-setup-body .info {
+    text-align: left;
+    background: #e3f2fd;
+    padding: 15px;
+    border-radius: 5px;
+    margin: 20px 0;
+}
+
+.qr-fallback {
+    display: none;
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    color: #856404;
+    padding: 12px 15px;
+    border-radius: 5px;
+    margin: 10px 0;
+    font-size: 14px;
+}
+
+/* ============================================
+ * MFA FORM PAGE
+ * ============================================ */
+.mfa-page-body {
+    font-family: Arial, sans-serif;
+    background: #f5f5f5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    margin: 0;
+}
+
+.mfa-container {
+    background: #fff;
+    padding: 40px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    max-width: 400px;
+    width: 100%;
+}
+
+.mfa-container h1 {
+    color: #2c3e50;
+    margin-bottom: 10px;
+    font-size: 24px;
+}
+
+.mfa-container p {
+    color: #666;
+    margin-bottom: 20px;
+}
+
+.mfa-container .form-group {
+    margin-bottom: 20px;
+}
+
+.mfa-container label {
+    display: block;
+    margin-bottom: 8px;
+    color: #555;
+    font-weight: 500;
+}
+
+.mfa-container input[type="text"] {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    font-size: 18px;
+    letter-spacing: 5px;
+    text-align: center;
+    font-family: monospace;
+}
+
+.mfa-container input[type="text"]:focus {
+    outline: none;
+    border-color: #3498db;
+}
+
+.mfa-container .btn {
+    width: 100%;
+    padding: 12px;
+    background: #3498db;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.mfa-container .btn:hover {
+    background: #2980b9;
+}
+
+.mfa-container .error {
+    background: #fee;
+    color: #c33;
+    padding: 12px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+    border: 1px solid #fcc;
+}
+
+.mfa-container .help {
+    font-size: 12px;
+    color: #999;
+    margin-top: 10px;
+}
+
+/* ============================================
+ * VIDEO PLAYER PAGE
+ * ============================================ */
+.player-page * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+.player-page {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #000;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.player-page .header {
+    background: #1a1a1a;
+    padding: 15px 20px;
+    border-bottom: 1px solid #333;
+}
+
+.player-page .header h1 {
+    font-size: 18px;
+    font-weight: 500;
+    color: #fff;
+}
+
+.player-page .video-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: #000;
+}
+
+.player-page video {
+    max-width: 100%;
+    max-height: calc(100vh - 200px);
+    width: auto;
+    height: auto;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.player-page .controls {
+    background: #1a1a1a;
+    padding: 20px;
+    text-align: center;
+    border-top: 1px solid #333;
+}
+
+.player-page .btn {
+    display: inline-block;
+    padding: 12px 24px;
+    margin: 5px;
+    background: #3498db;
+    color: #fff;
+    text-decoration: none;
+    border-radius: 6px;
+    font-size: 14px;
+    transition: background 0.2s;
+}
+
+.player-page .btn:hover {
+    background: #2980b9;
+}
+
+.player-page .btn-secondary {
+    background: #95a5a6;
+}
+
+.player-page .btn-secondary:hover {
+    background: #7f8c8d;
+}
+
+.player-page .btn-vlc {
+    background: #e67e22;
+}
+
+.player-page .btn-vlc:hover {
+    background: #d35400;
+}
+
+.player-page .info {
+    background: #2c2c2c;
+    padding: 15px 20px;
+    font-size: 13px;
+    color: #999;
+}
+
+.player-page .info-item {
+    display: inline-block;
+    margin-right: 20px;
+    margin-bottom: 5px;
+}
+
+.player-page .info-label {
+    color: #666;
+    margin-right: 5px;
+}
+
+@media (max-width: 768px) {
+    .player-page video {
+        max-height: calc(100vh - 250px);
+    }
+
+    .player-page .btn {
+        display: block;
+        width: 100%;
+        margin: 5px 0;
+    }
+}
+
+/* ============================================
+ * MAIN FILE BROWSER PAGE
+ * ============================================ */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background: #f5f5f5;
+    color: #333;
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+header {
+    background: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+}
+
+h1 {
+    color: #2c3e50;
+    font-size: 24px;
+    margin-bottom: 10px;
+}
+
+.breadcrumb {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 5px;
+    padding: 10px 0;
+    color: #666;
+}
+
+.breadcrumb a {
+    color: #3498db;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.breadcrumb a:hover {
+    color: #2980b9;
+    text-decoration: underline;
+}
+
+.error {
+    background: #fee;
+    color: #c33;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border: 1px solid #fcc;
+}
+
+.file-list {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+.file-item {
+    display: flex;
+    align-items: center;
+    padding: 15px 20px;
+    border-bottom: 1px solid #eee;
+    transition: background 0.2s;
+}
+
+.file-item:hover {
+    background: #f9f9f9;
+}
+
+.file-item:last-child {
+    border-bottom: none;
+}
+
+.file-icon {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 15px;
+    font-size: 24px;
+}
+
+.file-info {
+    flex: 1;
+}
+
+.file-name {
+    font-weight: 500;
+    color: #2c3e50;
+    margin-bottom: 3px;
+}
+
+.file-name a {
+    color: #3498db;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.file-name a:hover {
+    color: #2980b9;
+    text-decoration: underline;
+}
+
+.file-meta {
+    font-size: 13px;
+    color: #777;
+}
+
+.file-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.btn {
+    padding: 8px 16px;
+    border-radius: 5px;
+    text-decoration: none;
+    font-size: 14px;
+    transition: all 0.2s;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-download {
+    background: #3498db;
+    color: #fff;
+}
+
+.btn-download:hover {
+    background: #2980b9;
+}
+
+.btn-view {
+    background: #95a5a6;
+    color: #fff;
+}
+
+.btn-view:hover {
+    background: #7f8c8d;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #999;
+}
+
+.empty-state-icon {
+    font-size: 64px;
+    margin-bottom: 20px;
+    opacity: 0.3;
+}
+
+.camera-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    background: #3498db;
+    color: #fff;
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: 500;
+    margin-left: 8px;
+}
+
+.video-badge {
+    background: #e74c3c;
+}
+
+.image-badge {
+    background: #2ecc71;
+}
+
+.filter-bar {
+    background: #fff;
+    padding: 15px 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.filter-bar label {
+    font-weight: 500;
+    color: #555;
+}
+
+.filter-bar select,
+.filter-bar input {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+.filter-bar .search-input {
+    flex: 1;
+    min-width: 200px;
+}
+
+.pagination {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    background: #f8f9fa;
+    border-top: 1px solid #e9ecef;
+    gap: 10px;
+}
+
+.pagination a {
+    display: inline-block;
+    padding: 8px 20px;
+    background: #3498db;
+    color: #fff;
+    text-decoration: none;
+    border-radius: 5px;
+    font-size: 14px;
+    transition: background 0.2s;
+}
+
+.pagination a:hover {
+    background: #2980b9;
+}
+
+.pagination .page-info {
+    font-size: 13px;
+    color: #666;
+}
+
+.pagination .spacer {
+    flex: 1;
+}
+
+@media (max-width: 768px) {
+    .file-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .file-actions {
+        margin-top: 10px;
+        width: 100%;
+    }
+
+    .btn {
+        width: 100%;
+        text-align: center;
+    }
+}
+
+/* ============================================
+ * HEADER SESSION BAR & UTILITY CLASSES
+ * ============================================ */
+.session-bar {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.link-mfa {
+    color: #3498db;
+    text-decoration: none;
+}
+
+.link-logout {
+    color: #e74c3c;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.debug-info {
+    background: #e3f2fd;
+    padding: 10px;
+    border-radius: 5px;
+    margin-top: 10px;
+    font-size: 12px;
+    color: #1565c0;
+}
+
+.config-list {
+    margin: 10px 0 0 20px;
+}
+
+.debug-list {
+    margin: 10px 0 0 20px;
+    font-size: 12px;
+}
