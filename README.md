@@ -4,20 +4,27 @@ A secure, feature-rich web interface for browsing and streaming camera footage s
 
 ![PHP Version](https://img.shields.io/badge/PHP-%3E%3D7.4-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
-![Security](https://img.shields.io/badge/security-MFA%20%2B%20Rate%20Limiting-brightgreen)
+![Security](https://img.shields.io/badge/security-CSP%20%2B%20MFA%20%2B%20Rate%20Limiting-brightgreen)
 
 ## Features
 
 ### Security & Authentication
+- **Content Security Policy (CSP)** - Strict per-request nonce-based policy; no `unsafe-inline`
 - **HTTP Basic Authentication** - Password-protected access
 - **Multi-Factor Authentication (TOTP)** - Google Authenticator, Authy, etc.
-- **Rate Limiting** - Fail2ban-style brute force protection
-- **Activity Logging** - Comprehensive audit trail
-- **Email Alerts** - Real-time security notifications
+- **CSRF Protection** - Session-bound tokens on all forms
+- **Rate Limiting** - Fail2ban-style brute force protection with file-level locking
+- **TOTP Replay Prevention** - Cross-session global tracking of used time-slices
+- **Timing-Safe Comparisons** - `hash_equals()` on all credential checks
+- **Session Fixation Protection** - Session ID regenerated on login
+- **Path Traversal Protection** - Strict input validation with optional prefix restriction
+- **Activity Logging** - Comprehensive JSON audit trail with automatic rotation
+- **Email Alerts** - Real-time HTML security notifications
 - **Secure Logout** - Clean session termination
 
 ### Media Viewing
 - **Video Playback** - Stream MP4s directly in browser with full seeking support
+- **iOS Compatibility** - Signed B2 URLs for Safari; VLC deep-link for iOS devices
 - **Player Controls** - Play, pause, seek, volume, fullscreen
 - **Keyboard Shortcuts** - Space to play/pause, arrows to seek, F for fullscreen
 - **Image Download** - JPG file support
@@ -28,6 +35,7 @@ A secure, feature-rich web interface for browsing and streaming camera footage s
 - **Search & Filter** - Find files by name or type
 - **File Metadata** - Size, date, camera ID display
 - **Breadcrumb Navigation** - Easy path traversal
+- **Pagination** - Handles large directories efficiently
 
 ### Performance & Reliability
 - **Streaming Downloads** - No memory limits, handles files of any size
@@ -41,7 +49,7 @@ A secure, feature-rich web interface for browsing and streaming camera footage s
 - PHP extensions: `curl`, `json`
 - Backblaze B2 account with a configured bucket
 - Web server (Apache/Nginx) or shared hosting
-- HTTPS/SSL certificate (recommended for security)
+- HTTPS/SSL certificate (required for security headers to be effective)
 
 ## Installation
 
@@ -71,7 +79,7 @@ cd b2-browser
 
 ### 3. Configure the Script
 
-Edit `b2-browser.php` and update the configuration section:
+Edit `b2-browse.php` and update the configuration section:
 
 ```php
 // B2 Credentials
@@ -80,11 +88,14 @@ define('B2_APPLICATION_KEY', 'your_application_key');
 define('B2_BUCKET_NAME', 'your_bucket_name');
 define('B2_BUCKET_ID', 'your_bucket_id');
 
+// Optional: restrict browsing to a specific prefix (e.g. 'camera-footage/')
+define('B2_ALLOWED_PREFIX', '');
+
 // Authentication
 define('AUTH_USERNAME', 'admin');
 define('AUTH_PASSWORD', 'your_secure_password');
 
-// Email Alerts
+// Domain and Contact
 define('YOUR_DOMAIN',   'yourdomain.com');
 define('YOUR_HOMEPAGE', 'https://yourdomain.com');
 define('ADMIN_EMAIL',   'admin@yourdomain.com');
@@ -107,11 +118,33 @@ define('LOG_FILE_PATH', '/path/to/logs/b2_activity.log');
 
 ### 5. Upload to Server
 
-Upload `b2-browser.php` to your web server via SFTP or hosting control panel.
+Upload **both files** to the same directory on your web server:
+- `b2-browse.php` — the application
+- `b2-browse.css` — the external stylesheet (required by the Content Security Policy)
 
 ### 6. Access
 
-Navigate to `https://yourdomain.com/b2-browser.php`
+Navigate to `https://yourdomain.com/b2-browse.php`
+
+## Content Security Policy
+
+The application enforces a strict Content Security Policy via HTTP headers. All inline styles have been extracted to `b2-browse.css`, and all inline scripts use per-request cryptographic nonces — eliminating the need for `unsafe-inline` in `script-src`.
+
+**CSP directives enforced:**
+
+| Directive | Value | Purpose |
+|-----------|-------|---------|
+| `default-src` | `'self'` | Baseline: same-origin only |
+| `script-src` | `'nonce-...'` | Only nonced scripts execute; XSS injection blocked |
+| `style-src` | `'self'` | External stylesheet only; no inline styles |
+| `img-src` | `'self' data:` | Same-origin images + data: URIs (QR code rendering) |
+| `media-src` | `'self' https://*.backblazeb2.com` | Video streaming from signed B2 URLs |
+| `form-action` | `'self'` | Forms can only submit to same origin |
+| `base-uri` | `'self'` | Prevents `<base>` tag injection |
+| `frame-ancestors` | `'none'` | Blocks framing (clickjacking protection) |
+| `object-src` | `'none'` | Blocks plugin embeds (Flash, Java, etc.) |
+
+**Additional security headers:** `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`
 
 ## Security Setup
 
@@ -119,7 +152,7 @@ Navigate to `https://yourdomain.com/b2-browser.php`
 
 #### Step 1: Generate MFA Secret
 
-While "MFA_ENABLED', false", add these temporary lines at the **top** of `b2-browser.php` (after `<?php`):
+While `MFA_ENABLED` is set to `false`, add these temporary lines at the **top** of `b2-browse.php` (after the security headers block):
 
 ```php
 // TEMPORARY: Generate MFA Secret
@@ -135,7 +168,7 @@ echo "Your MFA Secret: " . tempGenerateMFASecret();
 exit;
 ```
 
-Access the page, copy the secret, then **remove these lines** and set "MFA_ENABLED', true".
+Access the page, copy the secret, then **remove these lines** and set `MFA_ENABLED` to `true`.
 
 #### Step 2: Configure MFA
 
@@ -147,8 +180,9 @@ define('MFA_SECRET', 'YOUR_GENERATED_SECRET');
 #### Step 3: Set Up Authenticator App
 
 1. Install Google Authenticator, Authy, or Microsoft Authenticator
-2. Add the MFA secret that you generated to your Authenticator app manually
-5. **Save the MFA secret** securely as a backup in a password manager for safe keeping
+2. Add the MFA secret that you generated to your authenticator app manually
+3. Alternatively, log in and visit `?setup_mfa=1` to scan a QR code
+4. **Save the MFA secret** securely as a backup in a password manager
 
 **Compatible Apps:**
 - Google Authenticator (iOS/Android)
@@ -167,6 +201,12 @@ define('MAX_LOGIN_ATTEMPTS', 5);      // Failed attempts before lockout
 define('LOCKOUT_DURATION', 900);      // 15 minutes
 define('ATTEMPT_WINDOW', 300);        // 5 minutes
 ```
+
+For the rate-limit data file, you can optionally specify an explicit path outside the webroot:
+```php
+define('RATE_LIMIT_FILE', '/var/lib/b2-browse/rate_limit.json');
+```
+If left empty, a SHA-256-derived filename is auto-generated in the system temp directory.
 
 **Security Levels:**
 
@@ -261,23 +301,28 @@ camera-backups/
 | `B2_APPLICATION_KEY` | Required | Backblaze B2 Application Key |
 | `B2_BUCKET_NAME` | Required | B2 bucket name |
 | `B2_BUCKET_ID` | Required | B2 bucket ID |
+| `B2_ALLOWED_PREFIX` | `''` (unrestricted) | Restrict browsing/downloads to files under this path prefix |
+| `YOUR_DOMAIN` | Required | Domain name (used in email From address and footer) |
+| `YOUR_HOMEPAGE` | Required | Homepage URL (redirect target after logout) |
 | `AUTH_USERNAME` | `''` (disabled) | HTTP Basic Auth username |
 | `AUTH_PASSWORD` | `''` (disabled) | HTTP Basic Auth password |
 | `RATE_LIMIT_ENABLED` | `true` | Enable brute force protection |
 | `MAX_LOGIN_ATTEMPTS` | `5` | Failed attempts before lockout |
 | `LOCKOUT_DURATION` | `900` (15 min) | IP lockout duration in seconds |
 | `ATTEMPT_WINDOW` | `300` (5 min) | Time window for tracking attempts |
+| `RATE_LIMIT_FILE` | `''` (auto) | Explicit path for rate-limit data; auto-generates SHA-256-derived name if empty |
 | `MFA_ENABLED` | `false` | Enable Multi-Factor Authentication |
-| `MFA_SECRET` | `''` | TOTP secret (generate with script) |
+| `MFA_SECRET` | `''` | TOTP secret (base32-encoded; generate with helper script) |
+| `MFA_ISSUER` | `'B2 File Browser'` | Issuer name shown in authenticator apps |
 | `SESSION_TIMEOUT` | `1800` (30 min) | Session timeout in seconds |
 | `LOG_ENABLED` | `true` | Enable activity logging |
-| `LOG_FILE_PATH` | Required | Path to log file |
+| `LOG_FILE_PATH` | Required | Absolute path to log file |
 | `EMAIL_ALERTS_ENABLED` | `true` | Enable email notifications |
 | `ADMIN_EMAIL` | Required | Email alert Reply-To address |
-| `ALERT_EMAILS` | Required | Comma-separated email addresses |
-| `FILES_PER_PAGE` | `100` | Maximum files per directory, increase as needed |
-| `USE_SESSION_CACHE` | `true` | Cache B2 auth token in session |
-| `DEBUG_MODE` | `false` | Enable detailed error logging |
+| `ALERT_EMAILS` | Required | Comma-separated email addresses for alerts |
+| `FILES_PER_PAGE` | `100` | Maximum files per directory listing page |
+| `USE_SESSION_CACHE` | `true` | Cache B2 auth token in session (reduces API calls) |
+| `DEBUG_MODE` | `false` | Enable detailed error logging to PHP error log |
 
 ## Troubleshooting
 
@@ -296,10 +341,16 @@ camera-backups/
 **"Memory exhausted" (shouldn't happen with streaming)**
 - Check PHP memory limit: `memory_limit = 256M` in `php.ini`
 
-**Video won't play**
-- Ensure HTTPS is enabled (some browsers require it)
-- Check browser console for errors
+**Video won't play / "No video with supported format and MIME type found"**
+- Ensure `b2-browse.css` is in the same directory as `b2-browse.php` (CSP requires it)
+- Verify CSP `media-src` includes B2 download domains (it does by default)
+- Ensure HTTPS is enabled (some browsers require it for CSP to work)
+- Check browser console (F12) for any CSP violation reports
 - Try downloading the file to verify it's a valid MP4
+
+**Styles missing / page looks unstyled**
+- Ensure `b2-browse.css` is deployed alongside `b2-browse.php` in the same directory
+- Check browser console for CSP violations related to `style-src`
 
 **Files not appearing**
 - Enable `DEBUG_MODE` and check PHP error logs
@@ -310,14 +361,15 @@ camera-backups/
 
 **"Account Temporarily Locked"**
 - Wait for lockout duration to expire
-- Check `/tmp/b2_login_attempts.json` for details
-- Adjust rate limiting if too strict
+- The rate-limit file uses a SHA-256-derived filename in the temp directory (or at `RATE_LIMIT_FILE` if configured). You can delete it to reset all lockouts
+- Adjust rate limiting constants if too strict
 
 **MFA code not working**
 - Ensure server time is accurate (use NTP)
 - Verify secret was copied correctly
 - Check phone time is set to automatic
 - TOTP codes expire every 30 seconds
+- Each code can only be used once (replay protection); wait for the next code
 
 **Emails going to spam**
 - Add SPF record to your domain DNS
@@ -331,6 +383,10 @@ camera-backups/
 3. Temporarily set: `define('MFA_ENABLED', false);`
 4. Log in and set up new MFA secret
 5. Re-enable MFA
+
+**QR code not rendering on MFA setup page**
+- The QR library is loaded from `cdnjs.cloudflare.com` and authorised by the CSP nonce. If it fails to load, the page automatically shows the manual-entry fallback with the secret code
+- You can alternatively self-host `qrcode.min.js` in the same directory for a fully self-contained deployment
 
 ### Performance
 
@@ -361,23 +417,27 @@ camera-backups/
 ### Must Do
 - Use read-only B2 application keys
 - Enable HTTP Basic Authentication
-- Use HTTPS/SSL certificate
+- Use HTTPS/SSL certificate (CSP and nonces depend on a secure transport)
+- Deploy both `b2-browse.php` and `b2-browse.css` (CSP blocks inline styles)
 - Enable MFA for production use
 - Keep `DEBUG_MODE` disabled in production
-- Restrict file permissions (600/700)
+- Restrict file permissions (600 for PHP/CSS files, 700 for directories)
 
 ### Recommended
-- Enable email alerts for logins/lockouts
+- Set `RATE_LIMIT_FILE` to an explicit path outside the webroot
+- Set `B2_ALLOWED_PREFIX` to restrict browsing scope
+- Enable email alerts for logins and lockouts
 - Regular review of activity logs
 - Use strong, unique passwords (16+ characters)
 - Keep PHP and server software updated
 - Whitelist IP addresses if possible (hosting firewall)
 
 ### Advanced
-- Use B2 file name prefix restrictions
-- Monitor `/tmp/b2_login_attempts.json` for attacks
-- Set up log monitoring/alerting
-- Backups MFA secret
+- Self-host `qrcode.min.js` to eliminate the cdnjs.cloudflare.com dependency
+- Set up log monitoring/alerting (e.g. integrate with Grafana/Loki)
+- Monitor the rate-limit data file for attack patterns
+- Use a `Report-URI` or `report-to` CSP directive to collect violation reports
+- Back up your MFA secret securely
 
 ## Activity Logging
 
@@ -391,7 +451,7 @@ Logs are stored in JSON format at `LOG_FILE_PATH`:
 **Events logged:**
 - `LOGIN_SUCCESS` - Successful authentication
 - `LOGIN_FAILED` - Failed login attempt
-- `MFA_FAILED` - Invalid MFA code
+- `MFA_FAILED` - Invalid MFA code (includes replay detection)
 - `ACCOUNT_LOCKED` - Rate limit triggered
 - `LOGOUT` - User logged out
 - `FILE_DOWNLOAD` - File downloaded
@@ -434,14 +494,43 @@ If you encounter issues:
 1. Check the [Troubleshooting](#troubleshooting) section
 2. Enable `DEBUG_MODE` and review PHP error logs
 3. Check activity logs at `LOG_FILE_PATH`
-4. Open an issue on GitHub with:
+4. Open browser developer tools (F12) and check for CSP violations in the console
+5. Open an issue on GitHub with:
    - PHP version
-   - Error messages
+   - Error messages (including any CSP violation text)
    - Steps to reproduce
 
 ## Changelog
 
-### v1.2.0 (2026-03-14)
+### v1.4.0
+- **Content Security Policy** - Strict nonce-based CSP; no `unsafe-inline` in `script-src` or `style-src`
+- All inline CSS extracted to external `b2-browse.css`
+- All inline event handlers (`onclick`, `onchange`, `onkeyup`, `onerror`) replaced with `addEventListener` in nonced script blocks
+- Per-request cryptographic nonce generated via `random_bytes(16)`
+- Added CSP directives: `form-action`, `base-uri`, `frame-ancestors`, `object-src`, `img-src`, `media-src`
+- Added `X-Content-Type-Options: nosniff` header globally
+- Added `Referrer-Policy: no-referrer` header
+
+### v1.3.1
+- TOTP replay store moved from `$_SESSION` (per-session) to a shared server-side file with `flock(LOCK_EX)`, blocking replay across all sessions
+- QR code library switched from jsDelivr `qrcode` to cdnjs `qrcodejs` (more reliable, constructor API)
+- Visible fallback message when QR code CDN is unreachable
+
+### v1.3.0
+- **Security audit and hardening release** with 11 fixes:
+  - IP spoofing: `getClientIP()` uses only `REMOTE_ADDR`
+  - Session fixation: `session_regenerate_id(true)` on every login
+  - TOTP replay: used time-slices tracked and rejected
+  - MFA secret privacy: QR code rendered client-side (secret never sent to third-party servers)
+  - Path traversal: `sanitizeAndValidatePath()` with `B2_ALLOWED_PREFIX` enforcement
+  - Race condition: rate-limit file uses `flock(LOCK_EX)` for atomic read-modify-write
+  - Predictable rate-limit file: SHA-256-derived filename (or explicit `RATE_LIMIT_FILE`)
+  - Timing attacks: `hash_equals()` for all credential comparisons
+  - CSRF protection: session-bound token on MFA form
+  - `session_write_close()` ordering: `last_activity` updated before session release
+  - First-time stream 403: `?stream=` accepts valid Basic Auth when no session exists
+
+### v1.2.0
 - Added video playback with HTML5 player
 - HTTP Range support for video seeking
 - Keyboard shortcuts for video control
@@ -450,7 +539,7 @@ If you encounter issues:
 - Fixed SPF alignment for email delivery
 - Email alerts to multiple addresses
 
-### v1.1.0 (2026-03-13)
+### v1.1.0
 - Added Multi-Factor Authentication (TOTP)
 - Added fail2ban-style rate limiting
 - Activity logging system
@@ -458,19 +547,20 @@ If you encounter issues:
 - Secure logout functionality
 - Enhanced security measures
 
-### v1.0.0 (2026-01-15)
+### v1.0.0
 - Initial release
 - Folder navigation
-- Byte level streaming downloads
+- Byte-level streaming downloads
 - HTTP Basic Authentication
 - Search and filter
 - Mobile responsive design
 
 ---
 
-**Security Notice:** 
+**Security Notice:**
 - Never commit credentials to version control
 - Always use HTTPS in production
+- Deploy both `b2-browse.php` and `b2-browse.css` to the same directory
 - Enable MFA for sensitive camera footage
 - Regularly review activity logs
 - Keep MFA secret backed up securely
