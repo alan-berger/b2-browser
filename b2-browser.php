@@ -79,6 +79,23 @@ header("Content-Security-Policy: "
 header("X-Frame-Options: DENY");
 header("X-Content-Type-Options: nosniff");
 header("Referrer-Policy: no-referrer");
+header("Permissions-Policy: "
+    . "accelerometer=(), "
+    . "ambient-light-sensor=(), "
+    . "autoplay=(self), "
+    . "camera=(), "
+    . "display-capture=(), "
+    . "encrypted-media=(self), "
+    . "fullscreen=(self), "
+    . "geolocation=(), "
+    . "gyroscope=(), "
+    . "magnetometer=(), "
+    . "microphone=(), "
+    . "midi=(), "
+    . "payment=(), "
+    . "picture-in-picture=(self), "
+    . "usb=()"
+);
 
 // ============================================
 // CONFIGURATION - FILL THESE IN
