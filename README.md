@@ -5,12 +5,14 @@ A secure, feature-rich web interface for browsing and streaming camera footage s
 ![PHP Version](https://img.shields.io/badge/PHP-%3E%3D7.4-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Security](https://img.shields.io/badge/security-CSP%20%2B%20MFA%20%2B%20Rate%20Limiting-brightgreen)
+![Security Headers](https://img.shields.io/badge/securityheaders.com-A%2B-brightgreen)
 ![Secrets](https://img.shields.io/badge/secrets-outside%20webroot-important)
 
 ## Features
 
 ### Security & Authentication
 - **Content Security Policy (CSP)** - Strict per-request nonce-based policy; no `unsafe-inline`
+- **Permissions Policy** - Browser feature access explicitly denied except where required by the video player
 - **HTTP Basic Authentication** - Password-protected access
 - **Multi-Factor Authentication (TOTP)** - Google Authenticator, Authy, etc.
 - **CSRF Protection** - Session-bound tokens on all forms
@@ -204,9 +206,13 @@ Upload the following files to your web server:
 
 Navigate to `https://yourdomain.com/b2browse.php`
 
-## Content Security Policy
+## Security Headers
 
-The application enforces a strict Content Security Policy via HTTP headers. All inline styles have been extracted to `b2-browse.css`, and all inline scripts use per-request cryptographic nonces — eliminating the need for `unsafe-inline` in `script-src`.
+The application enforces a strict set of HTTP security headers on every response, including error and authentication pages. This configuration achieves an **A+** rating on [securityheaders.com](https://securityheaders.com).
+
+### Content Security Policy
+
+All inline styles have been extracted to `b2browse.css`, and all inline scripts use per-request cryptographic nonces — eliminating the need for `unsafe-inline` in `script-src`.
 
 **CSP directives enforced:**
 
@@ -222,7 +228,21 @@ The application enforces a strict Content Security Policy via HTTP headers. All 
 | `frame-ancestors` | `'none'` | Blocks framing (clickjacking protection) |
 | `object-src` | `'none'` | Blocks plugin embeds (Flash, Java, etc.) |
 
-**Additional security headers:** `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`
+### Permissions Policy
+
+Browser features are explicitly denied except for the subset required by the video player:
+
+| Feature | Value | Reason |
+|---------|-------|--------|
+| `fullscreen` | `(self)` | Required for video fullscreen button |
+| `picture-in-picture` | `(self)` | Required for browser PiP control |
+| `autoplay` | `(self)` | Required for video playback |
+| `encrypted-media` | `(self)` | Required for EME negotiation on video streams |
+| All others | `()` | Explicitly denied (camera, geolocation, microphone, payment, USB, etc.) |
+
+### Additional Headers
+
+`X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`
 
 ## Security Setup
 
@@ -590,6 +610,10 @@ If you encounter issues:
    - Steps to reproduce
 
 ## Changelog
+
+### v1.5.1
+- **Permissions-Policy header** added, explicitly denying all browser features except those required by the video player (`fullscreen`, `picture-in-picture`, `autoplay`, `encrypted-media` restricted to same origin)
+- Achieves **A+** rating on [securityheaders.com](https://securityheaders.com)
 
 ### v1.5.0
 - **Secrets outside the document root** — credentials (`B2_KEY_ID`, `B2_APPLICATION_KEY`, `B2_BUCKET_NAME`, `B2_BUCKET_ID`, `AUTH_USERNAME`, `AUTH_PASSWORD`, `MFA_SECRET`) are now loaded from a separate `b2browse-secrets.php` file that lives outside the webroot
