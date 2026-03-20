@@ -61,6 +61,9 @@
 //   base-uri    — prevent <base> tag injection
 //   object-src  — block plugins (Flash, Java, etc.)
 //   frame-ancestors — equivalent to X-Frame-Options: DENY
+
+require_once __DIR__ . '/../private/b2browse-secrets.php';
+
 $cspNonce = base64_encode(random_bytes(16));
 header("Content-Security-Policy: "
     . "default-src 'self'; "
@@ -82,24 +85,24 @@ header("Referrer-Policy: no-referrer");
 // ============================================
 
 // Backblaze B2 Credentials
-define('B2_KEY_ID',          'your_application_key_id');
-define('B2_APPLICATION_KEY', 'your_application_key');
-define('B2_BUCKET_NAME',     'your_bucket_name');
-define('B2_BUCKET_ID',       'your_bucket_id');
+defined('B2_KEY_ID')           || define('B2_KEY_ID', '');
+defined('B2_APPLICATION_KEY')  || define('B2_APPLICATION_KEY', '');
+defined('B2_BUCKET_NAME')      || define('B2_BUCKET_NAME', '');
+defined('B2_BUCKET_ID')        || define('B2_BUCKET_ID', '');
 
 // Fix #5 — restrict download/stream/play to files whose path starts with this
-// prefix (e.g. 'camera-footage/'). Leave empty to allow any file in the bucket.
-define('B2_ALLOWED_PREFIX', '');
+// prefix (e.g. 'camera-footage/'). Leave empty to allow any file in the bucket or modify to 
+define('B2_ALLOWED_PREFIX', 'camera-footage');
 
 // Your Domain and Contact Information
 define('YOUR_DOMAIN',   'yourdomain.com');
 define('YOUR_HOMEPAGE', 'https://yourdomain.com');
 define('ADMIN_EMAIL',   'admin@yourdomain.com');
-define('ALERT_EMAILS',  'admin@yourdomain.com,backup@yourdomain.com');
+define('ALERT_EMAILS',  'admin@yourdomain.com,alt-recipient@yourdomain.com');
 
 // Basic authentication — leave both empty to disable
-define('AUTH_USERNAME', '');
-define('AUTH_PASSWORD', '');
+defined('AUTH_USERNAME')     || define('AUTH_USERNAME', '');
+defined('AUTH_PASSWORD')     || define('AUTH_PASSWORD', '');
 
 // Rate Limiting (fail2ban style)
 define('RATE_LIMIT_ENABLED',  true);
@@ -110,16 +113,16 @@ define('ATTEMPT_WINDOW',      300); // seconds (5 minutes)
 // Fix #7 — absolute path for the rate-limit data file.
 // Must be writable by PHP and ideally outside the webroot.
 // Leave empty to auto-generate a hard-to-guess name in sys_get_temp_dir().
-define('RATE_LIMIT_FILE', '');
+define('RATE_LIMIT_FILE', '/home/username/temp/b2_login_attempts.json');
 
 // Multi-Factor Authentication (TOTP) — optional but strongly recommended
 define('MFA_ENABLED', false);
-define('MFA_SECRET',  '');
+defined('MFA_SECRET')        || define('MFA_SECRET', '');
 define('MFA_ISSUER',  'B2 File Browser');
 
 // Activity Logging and Email Alerts
 define('LOG_ENABLED',          true);
-define('LOG_FILE_PATH',        '/path/to/activity.log');
+define('LOG_FILE_PATH',        '/home/username/logs/b2_activity.log');
 define('EMAIL_ALERTS_ENABLED', true);
 define('ALERT_ON_LOGIN',         true);
 define('ALERT_ON_FAILED_LOGIN',  true);
