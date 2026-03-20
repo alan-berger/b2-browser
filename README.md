@@ -5,6 +5,7 @@ A secure, feature-rich web interface for browsing and streaming camera footage s
 ![PHP Version](https://img.shields.io/badge/PHP-%3E%3D7.4-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Security](https://img.shields.io/badge/security-CSP%20%2B%20MFA%20%2B%20Rate%20Limiting-brightgreen)
+![Secrets](https://img.shields.io/badge/secrets-outside%20webroot-important)
 
 ## Features
 
@@ -77,54 +78,131 @@ cd b2-browser
 - `readFiles` - Download/stream files
 - `listBuckets` or `listAllBucketNames` - Required for bucket-specific keys
 
-### 3. Configure the Script
+### 3. Create the Secrets File
 
-Edit `b2-browse.php` and update the configuration section:
+All sensitive credentials live in a separate file — `b2browse-secrets.php` — that must be placed **outside your document root**. This means that even if your web server is misconfigured and accidentally serves PHP files as plain text, your credentials are never exposed.
+
+**Typical directory layout:**
+
+```
+/home/username/
+├── private/
+│   └── b2browse-secrets.php   ← secrets file lives here (not web-accessible)
+└── public_html/               ← your document root
+    ├── b2browse.php
+    └── b2browse.css
+```
+
+On cPanel-based shared hosting the structure is usually:
+
+```
+/home/username/
+├── private/
+│   └── b2browse-secrets.php
+└── public_html/
+    ├── b2browse.php
+    └── b2browse.css
+```
+
+The `require_once` at the top of `b2browse.php` loads this file automatically:
 
 ```php
-// B2 Credentials
-define('B2_KEY_ID', 'your_application_key_id');
+require_once __DIR__ . '/../private/b2browse-secrets.php';
+```
+
+**Create the `private/` directory and the secrets file:**
+
+```bash
+mkdir -p ~/private
+chmod 700 ~/private
+cp b2browse-secrets.php ~/private/b2browse-secrets.php
+chmod 400 ~/private/b2browse-secrets.php
+```
+
+`400` (read-only, owner only) is stricter than the conventional `600` — PHP only ever reads this file, so write access is unnecessary. If you need to edit it in future, temporarily unlock it, make your changes, then lock it down again:
+
+```bash
+chmod 600 ~/private/b2browse-secrets.php
+# edit the file
+chmod 400 ~/private/b2browse-secrets.php
+```
+
+**Populate `b2browse-secrets.php` with your actual credentials:**
+
+```php
+<?php
+
+define('B2_KEY_ID',          'your_application_key_id');
 define('B2_APPLICATION_KEY', 'your_application_key');
-define('B2_BUCKET_NAME', 'your_bucket_name');
-define('B2_BUCKET_ID', 'your_bucket_id');
+define('B2_BUCKET_NAME',     'your_bucket_name');
+define('B2_BUCKET_ID',       'your_bucket_id');
+define('AUTH_USERNAME',      'admin');
+define('AUTH_PASSWORD',      'your_secure_password');
+define('MFA_SECRET',         '');   // fill in after generating — see MFA setup below
+```
 
-// Optional: restrict browsing to a specific prefix (e.g. 'camera-footage/')
-define('B2_ALLOWED_PREFIX', '');
+> **Do not commit this file to version control.** Add `private/b2browse-secrets.php` to your `.gitignore`. The application's `b2browse.php` contains only safe placeholder defaults — all real secrets belong exclusively in this file.
 
-// Authentication
-define('AUTH_USERNAME', 'admin');
-define('AUTH_PASSWORD', 'your_secure_password');
+### 4. Configure the Script
 
-// Domain and Contact
+The non-sensitive configuration options remain in `b2browse.php`. Edit these to match your environment:
+
+```php
+// Optional: restrict browsing to a specific path prefix (e.g. 'camera-footage/')
+// Leave empty to allow access to any file in the bucket
+define('B2_ALLOWED_PREFIX', 'camera-backups');
+
+// Your Domain and Contact Information
 define('YOUR_DOMAIN',   'yourdomain.com');
 define('YOUR_HOMEPAGE', 'https://yourdomain.com');
 define('ADMIN_EMAIL',   'admin@yourdomain.com');
 define('ALERT_EMAILS',  'admin@yourdomain.com,backup@yourdomain.com');
+
+// Rate Limiting
+define('RATE_LIMIT_ENABLED',  true);
+define('MAX_LOGIN_ATTEMPTS',  5);
+define('LOCKOUT_DURATION',    900);  // 15 minutes
+define('ATTEMPT_WINDOW',      300);  // 5 minutes
+define('RATE_LIMIT_FILE', '/home/username/temp/b2_login_attempts.json');
+
+// Activity Logging and Email Alerts
+define('LOG_ENABLED',          true);
+define('LOG_FILE_PATH',        '/home/username/logs/b2_activity.log');
+define('EMAIL_ALERTS_ENABLED', true);
+
+// MFA toggle (secret itself lives in b2browse-secrets.php)
+define('MFA_ENABLED', false);   // set to true after completing MFA setup below
 ```
 
-### 4. Set Up Activity Logging
+### 5. Set Up Activity Logging
 
 ```bash
-mkdir -p /path/to/logs
-chmod 700 /path/to/logs
-touch /path/to/logs/b2_activity.log
-chmod 600 /path/to/logs/b2_activity.log
+mkdir -p /home/username/logs
+chmod 700 /home/username/logs
+touch /home/username/logs/b2_activity.log
+chmod 600 /home/username/logs/b2_activity.log
 ```
 
-Update in the script:
+Update the path in `b2browse.php`:
 ```php
-define('LOG_FILE_PATH', '/path/to/logs/b2_activity.log');
+define('LOG_FILE_PATH', '/home/username/logs/b2_activity.log');
 ```
 
-### 5. Upload to Server
+### 6. Upload to Server
 
-Upload **both files** to the same directory on your web server:
-- `b2-browse.php` — the application
-- `b2-browse.css` — the external stylesheet (required by the Content Security Policy)
+Upload the following files to your web server:
 
-### 6. Access
+| File | Destination | Notes |
+|------|-------------|-------|
+| `b2browse.php` | Document root (e.g. `public_html/`) | The main application |
+| `b2browse.css` | Document root (e.g. `public_html/`) | Required by the CSP — must be in the same directory |
+| `b2browse-secrets.php` | **Outside** document root (e.g. `private/`) | Must **not** be web-accessible |
 
-Navigate to `https://yourdomain.com/b2-browse.php`
+> **Critical:** If `b2browse-secrets.php` is placed inside the document root, a misconfigured server could expose your B2 credentials, password, and MFA secret as plain text. Always verify the `private/` directory is not reachable via a browser before going live.
+
+### 7. Access
+
+Navigate to `https://yourdomain.com/b2browse.php`
 
 ## Content Security Policy
 
@@ -152,10 +230,10 @@ The application enforces a strict Content Security Policy via HTTP headers. All 
 
 #### Step 1: Generate MFA Secret
 
-While `MFA_ENABLED` is set to `false`, add these temporary lines at the **top** of `b2-browse.php` (after the security headers block):
+While `MFA_ENABLED` is set to `false` in `b2browse.php`, add these temporary lines at the **top** of `b2browse.php` (after the `require_once` line):
 
 ```php
-// TEMPORARY: Generate MFA Secret
+// TEMPORARY: Generate MFA Secret — remove after copying the output
 function tempGenerateMFASecret($length = 16) {
     $chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
     $secret = '';
@@ -168,14 +246,23 @@ echo "Your MFA Secret: " . tempGenerateMFASecret();
 exit;
 ```
 
-Access the page, copy the secret, then **remove these lines** and set `MFA_ENABLED` to `true`.
+Access the page, copy the generated secret, then **remove these lines** before continuing.
 
 #### Step 2: Configure MFA
 
+Copy the generated secret into `b2browse-secrets.php` (outside the document root):
+
 ```php
-define('MFA_ENABLED', true);
 define('MFA_SECRET', 'YOUR_GENERATED_SECRET');
 ```
+
+Then enable MFA in `b2browse.php`:
+
+```php
+define('MFA_ENABLED', true);
+```
+
+> The MFA secret is a sensitive credential — it belongs in `b2browse-secrets.php` alongside your other secrets, never hardcoded in `b2browse.php` directly.
 
 #### Step 3: Set Up Authenticator App
 
@@ -378,11 +465,11 @@ camera-backups/
 - Ensure proper DMARC alignment
 
 **Locked out of MFA**
-1. Access server via SSH/FTP
-2. Edit the PHP file
-3. Temporarily set: `define('MFA_ENABLED', false);`
-4. Log in and set up new MFA secret
-5. Re-enable MFA
+1. Access the server via SSH/FTP
+2. Edit `b2browse-secrets.php` (outside the document root)
+3. Temporarily clear the secret: `define('MFA_SECRET', '');`
+4. Also set `define('MFA_ENABLED', false);` in `b2browse.php`
+5. Log in, generate and configure a new MFA secret, then re-enable MFA
 
 **QR code not rendering on MFA setup page**
 - The QR library is loaded from `cdnjs.cloudflare.com` and authorised by the CSP nonce. If it fails to load, the page automatically shows the manual-entry fallback with the secret code
@@ -415,13 +502,15 @@ camera-backups/
 ## Security Best Practices
 
 ### Must Do
+- Place `b2browse-secrets.php` **outside the document root** (e.g. `~/private/`) — this is not optional
 - Use read-only B2 application keys
 - Enable HTTP Basic Authentication
 - Use HTTPS/SSL certificate (CSP and nonces depend on a secure transport)
-- Deploy both `b2-browse.php` and `b2-browse.css` (CSP blocks inline styles)
+- Deploy both `b2browse.php` and `b2browse.css` to the document root (CSP blocks inline styles)
 - Enable MFA for production use
 - Keep `DEBUG_MODE` disabled in production
-- Restrict file permissions (600 for PHP/CSS files, 700 for directories)
+- Restrict file permissions: `600` for PHP/CSS files and the secrets file, `700` for directories
+- Never commit `b2browse-secrets.php` to version control — add it to `.gitignore`
 
 ### Recommended
 - Set `RATE_LIMIT_FILE` to an explicit path outside the webroot
@@ -502,6 +591,12 @@ If you encounter issues:
 
 ## Changelog
 
+### v1.5.0
+- **Secrets outside the document root** — credentials (`B2_KEY_ID`, `B2_APPLICATION_KEY`, `B2_BUCKET_NAME`, `B2_BUCKET_ID`, `AUTH_USERNAME`, `AUTH_PASSWORD`, `MFA_SECRET`) are now loaded from a separate `b2browse-secrets.php` file that lives outside the webroot
+- `defined()…||…define()` fallback pattern in `b2browse.php` ensures safe defaults if a constant is absent from the secrets file
+- `require_once __DIR__ . '/../private/b2browse-secrets.php'` loads the secrets file at the top of the script, before any credential is referenced
+- Installation instructions updated to reflect the new two-file deployment model
+
 ### v1.4.0
 - **Content Security Policy** - Strict nonce-based CSP; no `unsafe-inline` in `script-src` or `style-src`
 - All inline CSS extracted to external `b2-browse.css`
@@ -558,11 +653,12 @@ If you encounter issues:
 ---
 
 **Security Notice:**
-- Never commit credentials to version control
+- `b2browse-secrets.php` must live **outside the document root** — verify this before going live
+- Never commit `b2browse-secrets.php` to version control
 - Always use HTTPS in production
-- Deploy both `b2-browse.php` and `b2-browse.css` to the same directory
+- Deploy both `b2browse.php` and `b2browse.css` to the same directory in the document root
 - Enable MFA for sensitive camera footage
 - Regularly review activity logs
-- Keep MFA secret backed up securely
+- Keep your MFA secret backed up securely (e.g. in a password manager)
 
 **Made with ❤️ for secure home camera systems**
