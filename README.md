@@ -150,7 +150,7 @@ The non-sensitive configuration options remain in `b2browse.php`. Edit these to 
 ```php
 // Optional: restrict browsing to a specific path prefix (e.g. 'camera-footage/')
 // Leave empty to allow access to any file in the bucket
-define('B2_ALLOWED_PREFIX', 'camera-backups');
+define('B2_ALLOWED_PREFIX', 'camera-footage');
 
 // Your Domain and Contact Information
 define('YOUR_DOMAIN',   'yourdomain.com');
