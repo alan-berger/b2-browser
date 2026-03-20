@@ -115,7 +115,7 @@ require_once __DIR__ . '/../private/b2browse-secrets.php';
 ```bash
 mkdir -p ~/private
 chmod 500 ~/private
-cp b2browse-secrets.php ~/private/b2browse-secrets.php
+touch ~/private/b2browse-secrets.php
 chmod 400 ~/private/b2browse-secrets.php
 ```
 
