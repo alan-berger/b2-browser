@@ -1,9 +1,8 @@
 /**
- * b2-browse.css — External stylesheet for b2-browse.php
- * Extracted from inline styles to comply with CSP:
- *   default-src 'self'; script-src 'self' 'unsafe-inline';
+ * b2-browse.css — stylesheet for b2-browser.
  *
- * All inline <style> blocks and style="" attributes have been moved here.
+ * Served from the same origin under a CSP of style-src 'self': there are no
+ * inline <style> blocks or style="" attributes anywhere in the app.
  */
 
 /* ============================================
@@ -94,7 +93,7 @@
 }
 
 .qr-fallback {
-    display: none;
+    display: block; /* toggled with the hidden attribute */
     background: #fff3cd;
     border: 1px solid #ffc107;
     color: #856404;
@@ -622,4 +621,124 @@ h1 {
 .debug-list {
     margin: 10px 0 0 20px;
     font-size: 12px;
+}
+
+/* ============================================
+ * v2.0 ADDITIONS
+ * ============================================ */
+[hidden] {
+    display: none !important;
+}
+
+/* Login form: the username/password fields use normal text styling;
+ * the spaced monospace style above is for the 6-digit code. */
+.mfa-container input#username,
+.mfa-container input[type="password"] {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    font-size: 16px;
+    letter-spacing: normal;
+    text-align: left;
+    font-family: inherit;
+}
+
+.mfa-container input[type="password"]:focus {
+    outline: none;
+    border-color: #3498db;
+}
+
+.notice {
+    background: #fff8e1;
+    color: #8a6d00;
+    padding: 12px;
+    border-radius: 5px;
+    margin: 0 0 20px;
+    border: 1px solid #ffe08a;
+}
+
+.player-page .notice {
+    margin: 15px auto 0;
+    max-width: 1200px;
+}
+
+.error-details {
+    display: inline-block;
+    text-align: left;
+    margin: 15px auto 0;
+    padding-left: 20px;
+    font-size: 14px;
+    color: #555;
+}
+
+.logout-form {
+    margin: 0;
+}
+
+.logout-form .link-logout {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 500;
+}
+
+.logout-form .link-logout:hover {
+    text-decoration: underline;
+}
+
+.date-jump {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+    font-size: 14px;
+    color: #555;
+}
+
+.date-jump input[type="date"] {
+    padding: 6px 8px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font: inherit;
+}
+
+.date-jump .btn {
+    border: none;
+    cursor: pointer;
+    font: inherit;
+}
+
+.file-icon .thumb {
+    width: 64px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: 4px;
+    background: #eee;
+    display: block;
+}
+
+.file-icon:has(.thumb) {
+    width: 64px;
+}
+
+.keyboard-help {
+    text-align: center;
+    color: #888;
+    font-size: 12px;
+    margin: 10px 0 20px;
+}
+
+.mfa-setup-body code {
+    background: #f0f0f0;
+    padding: 1px 4px;
+    border-radius: 3px;
+}
+
+#qrcode svg {
+    width: 220px;
+    height: 220px;
 }

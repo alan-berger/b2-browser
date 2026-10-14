@@ -1,0 +1,2 @@
+# Defence in depth if this directory is ever placed under a web root.
+Require all denied
