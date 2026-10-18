@@ -196,7 +196,7 @@ $r = $c->get('?path=' . rawurlencode('camera-footage/2026/10/14/000001/'));
 check($r->status === 200, 'camera folder lists');
 check(str_contains($r->body, '&lt;img src=x onerror=alert(1)&gt;.jpg') && !str_contains($r->body, '<img src=x'), 'object names are HTML-escaped');
 check(!str_contains($r->body, 'hidden.mp4') && !str_contains($r->body, 'zz-partial.mp4'), 'hide markers and unfinished uploads are skipped');
-check(substr_count($r->body, 'class="thumb"') === 2, 'image thumbnails rendered', (string) substr_count($r->body, 'class="thumb"'));
+check(substr_count($r->body, 'class="thumb"') === 3, 'image thumbnails rendered', (string) substr_count($r->body, 'class="thumb"'));
 $auths = count(array_filter(mock_state()['calls'], static fn($c) => str_contains($c, 'b2_get_download_authorization')));
 check($auths === 1, 'one download authorisation covers all thumbnails in the folder', (string) $auths);
 check(str_contains($r->header('content-security-policy'), "img-src 'self' {$mock}"), 'CSP img-src allows only this account\'s download host', $r->header('content-security-policy'));

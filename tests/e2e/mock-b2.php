@@ -50,6 +50,7 @@ function objects(): array
         'camera-footage/2026/10/13/000001/09-00-00.mp4' => str_repeat('A', 1000),
         'camera-footage/2026/10/14/000001/10-30-00.mp4' => 'MP4DATA-' . str_repeat('x', 5000),
         'camera-footage/2026/10/14/000001/10-30-00.jpg' => sample_jpeg(),
+        'camera-footage/2026/10/14/000001/10-31-00.jpg' => sample_jpeg(true),
         'camera-footage/2026/10/14/000001/10-45-00 #1?.mp4' => 'special-name-video',
         'camera-footage/2026/10/14/000001/<img src=x onerror=alert(1)>.jpg' => 'evil',
         'camera-footage/2026/10/14/000001/empty.mp4' => '',
@@ -65,15 +66,19 @@ function objects(): array
 }
 
 /** A small real JPEG when GD is available (so thumbnails render), else JPEG-magic bytes. */
-function sample_jpeg(): string
+function sample_jpeg(bool $portrait = false): string
 {
     if (!function_exists('imagecreatetruecolor')) {
         return "\xFF\xD8\xFFjpegdata";
     }
-    $img = imagecreatetruecolor(160, 100);
+    [$w, $h] = $portrait ? [108, 192] : [192, 108];
+    $img = imagecreatetruecolor($w, $h);
     imagefill($img, 0, 0, imagecolorallocate($img, 52, 73, 94));
-    imagefilledrectangle($img, 20, 55, 140, 90, imagecolorallocate($img, 39, 174, 96));
-    imagefilledellipse($img, 120, 25, 30, 30, imagecolorallocate($img, 241, 196, 15));
+    imagefilledrectangle($img, 10, (int) ($h * 0.55), $w - 10, $h - 10, imagecolorallocate($img, 39, 174, 96));
+    imagefilledellipse($img, $w - 25, 25, 30, 30, imagecolorallocate($img, 241, 196, 15));
+    // A red border shows at a glance whether the edges are cropped.
+    imagerectangle($img, 0, 0, $w - 1, $h - 1, imagecolorallocate($img, 231, 76, 60));
+    imagerectangle($img, 1, 1, $w - 2, $h - 2, imagecolorallocate($img, 231, 76, 60));
     ob_start();
     imagejpeg($img, null, 80);
     return (string) ob_get_clean();

@@ -712,7 +712,8 @@ h1 {
     font: inherit;
 }
 
-/* Thumbnails: 16:9 to match camera snapshots; full width on phones. */
+/* Thumbnails: the whole image, never cropped. Landscape and portrait
+ * frames both fit inside a 240 px box at their own aspect ratio. */
 .file-icon:has(.thumb) {
     width: 240px;
     height: auto;
@@ -725,23 +726,24 @@ h1 {
 }
 
 .file-icon .thumb {
-    width: 100%;
-    aspect-ratio: 16 / 9;
+    display: block;
+    width: auto;
     height: auto;
-    object-fit: cover;
+    max-width: 100%;
+    max-height: 240px;
+    margin: 0 auto;
     border-radius: 4px;
     background: #eee;
-    display: block;
 }
 
 @media (max-width: 768px) {
-    .file-icon:has(.thumb),
-    .file-icon .thumb {
+    .file-icon:has(.thumb) {
         width: 100%;
+        margin: 0 0 10px;
     }
 
-    .file-icon:has(.thumb) {
-        margin: 0 0 10px;
+    .file-icon .thumb {
+        max-height: 60vh;
     }
 }
 
