@@ -1,10 +1,10 @@
 <?php
 /** @var callable $e */
-$bodyClass = 'mfa-page-body';
+$bodyClass = 'b2-page-auth';
 $pageTitle = 'Sign in';
 ?>
-<main class="mfa-container">
-    <h1>🔒 <?= $e($siteTitle) ?></h1>
+<section class="b2-card b2-auth">
+    <h1 class="b2-page-title">🔒 <?= $e($siteTitle) ?></h1>
 <?php if ($notice !== ''): ?>
     <div class="notice"><?= $e($notice) ?></div>
 <?php endif; ?>
@@ -22,7 +22,6 @@ $pageTitle = 'Sign in';
             <label for="password">Password</label>
             <input type="password" id="password" name="password" required autocomplete="current-password">
         </div>
-        <button type="submit" class="btn">Sign in</button>
+        <button type="submit" class="btn btn-primary btn-block">Sign in</button>
     </form>
-    <p class="message-action"><a href="<?= $e($homepage) ?>" class="link-primary">← Return to homepage</a></p>
-</main>
+</section>

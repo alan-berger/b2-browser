@@ -1,0 +1,30 @@
+/**
+ * Example b2-browser theme. Copy to theme.css (same folder), adjust, and
+ * list it in config.php after your site's own stylesheet:
+ *
+ *   'theme' => [
+ *       'stylesheets' => ['/style.css', 'assets/theme.css'],
+ *       ...
+ *   ],
+ *
+ * Colours are normally inherited from your site's stylesheet through the
+ * variables listed at the top of b2-browse.css (--bg, --text, --accent, …).
+ * Use this file for the things only b2-browser needs: fonts, width, and any
+ * colour your site's stylesheet does not define.
+ *
+ * Fonts must be served from this site (the CSP allows font-src 'self');
+ * declare them here with @font-face if your site's stylesheet does not.
+ */
+:root {
+    --b2-font-body:    "Your Body Font", Arial, sans-serif;
+    --b2-font-heading: "Your Heading Font", Arial, sans-serif;
+    /* --b2-font-mono: ui-monospace, monospace; */
+    /* --b2-max-width: 900px; */
+    /* --b2-font-size-adjust: none; */
+
+    /* Only needed if your site's stylesheet doesn't define them: */
+    /* --accent: #6ac283; --accent-hover: #44945e; */
+}
+
+/* Optional dark-mode overrides */
+/* [data-theme="dark"] { --accent-hover: #8dd4a0; } */

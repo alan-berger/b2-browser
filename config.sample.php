@@ -103,6 +103,29 @@ return [
     ],
 
     // -----------------------------------------------------------------
+    // Look and feel — match the site b2-browser lives on (all optional)
+    // -----------------------------------------------------------------
+    // Asset paths must be on this site (the CSP only allows 'self');
+    // navigation links may also be absolute http(s) URLs.
+    'theme' => [
+        // Loaded before the app's own stylesheet. If your site's CSS defines
+        // --bg, --text, --text-muted, --border, --accent and --accent-hover,
+        // the app picks those colours up automatically. Put fonts and width
+        // in your own theme.css (copy public/assets/theme.example.css).
+        'stylesheets'  => [],          // e.g. ['/style.css', 'assets/theme.css']
+        'logo'         => '',          // e.g. '/images/logo.svg' (shown at 64×64)
+        'logo_alt'     => '',
+        'heading'      => '',          // text beside the logo, e.g. 'example.org'
+        'heading_link' => '',          // defaults to site.homepage
+        'nav'          => [],          // e.g. [['HOME', '/'], ['ABOUT', '/about.php']]
+        'favicon'      => '',          // e.g. '/favicon.ico'
+        'toggle'       => true,        // light/dark switch in the navigation bar
+        // localStorage key for the light/dark choice. Use the same key as
+        // your site's own toggle so the two stay in step.
+        'storage_key'  => 'b2-theme',
+    ],
+
+    // -----------------------------------------------------------------
     // Activity log
     // -----------------------------------------------------------------
     'log' => [

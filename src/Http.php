@@ -33,8 +33,8 @@ final class Http
     }
 
     /**
-     * Security headers for HTML pages. Scripts and styles come only from this
-     * origin (no inline code at all, so no nonce is needed); images and video
+     * Security headers for HTML pages. Scripts, styles and fonts come only from
+     * this origin (no inline code at all, so no nonce is needed); images and video
      * may additionally come from the B2 download host for this account.
      *
      * @param list<string> $mediaOrigins
@@ -46,6 +46,7 @@ final class Http
             "default-src 'none'",
             "script-src 'self'",
             "style-src 'self'",
+            "font-src 'self'",
             trim("img-src 'self' {$media}"),
             $media !== '' ? "media-src {$media}" : "media-src 'none'",
             "form-action 'self'",

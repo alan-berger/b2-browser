@@ -1,10 +1,10 @@
 <?php
 /** @var callable $e */
-$bodyClass = 'page-message';
+$bodyClass = 'b2-page-message';
 $pageTitle = $title;
 $details = $details ?? [];
 ?>
-<main>
+<section class="b2-message">
     <h1 class="danger-heading"><?= $e($title) ?></h1>
     <p class="message-text"><?= $e($message) ?></p>
 <?php if ($details !== []): ?>
@@ -15,6 +15,6 @@ $details = $details ?? [];
     </ul>
 <?php endif; ?>
 <?php if (!empty($back)): ?>
-    <p class="message-action"><a href="?" class="link-primary">← Back to files</a></p>
+    <p class="message-action"><a href="?">← Back to files</a></p>
 <?php endif; ?>
-</main>
+</section>

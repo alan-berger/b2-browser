@@ -145,7 +145,33 @@ All settings live in `config.php`; see `config.sample.php` for comments.
 | `alerts.on_*` | login, failed login, lockout on | Which events alert |
 | `alerts.email.*` | disabled | `from`, `reply_to`, `recipients` (array) |
 | `alerts.ntfy.*` | disabled | `server`, `topic`, `token` (for protected topics) |
+| `theme.stylesheets` | `[]` | Site stylesheets loaded before the app's (same-origin paths) |
+| `theme.logo`, `theme.logo_alt`, `theme.heading`, `theme.heading_link` | empty | Branding shown at the top of every page |
+| `theme.nav` | `[]` | Navigation links, `[['LABEL', '/path'], …]` |
+| `theme.favicon` | empty | Favicon path |
+| `theme.toggle`, `theme.storage_key` | `true`, `b2-theme` | Light/dark switch and its localStorage key |
 | `debug` | `false` | Show error details in the browser — never in production |
+
+## Matching your site's look
+
+b2-browser can wear the theme of the site it's installed on: your stylesheet, fonts, logo, heading and navigation, plus a light/dark toggle. Everything is optional; with no `theme` settings it uses a clean built-in look that still follows the visitor's light/dark preference.
+
+```php
+'theme' => [
+    'stylesheets'  => ['/style.css', 'assets/theme.css'],
+    'logo'         => '/images/logo.svg',
+    'logo_alt'     => 'Example logo',
+    'heading'      => 'example.org',
+    'nav'          => [['HOME', '/'], ['ABOUT', '/about.php'], ['B2', '/b2/']],
+    'favicon'      => '/favicon.ico',
+    'storage_key'  => 'site-theme',   // same key as your site's toggle
+],
+```
+
+- **Colours** come from your site's stylesheet through CSS custom properties. If it defines `--bg`, `--text`, `--text-muted`, `--border`, `--accent` and `--accent-hover` (switching them under `[data-theme="dark"]`), b2-browser uses them; anything missing falls back to the built-in palette.
+- **Fonts, width and button text colour** go in a small `public/assets/theme.css` of your own — copy `theme.example.css`. It sets `--b2-font-body`, `--b2-font-heading`, `--b2-max-width` and `--b2-on-accent`. `theme.css` is git-ignored, so upgrades never overwrite it.
+- **Light/dark** is an attribute on `<html>` (`data-theme`), set before first paint by `theme-init.js` and switched by the toggle. With the same `storage_key` as your site, the visitor's choice carries across both.
+- **Security is unchanged.** Stylesheets, fonts, the logo and the favicon must be served by your own site, because the CSP only allows `'self'` for those; the config rejects anything else, and navigation links must be paths or `http(s)` URLs. Your site's inline theme scripts aren't needed: b2-browser does the same job from its own external script.
 
 ## Security model
 
@@ -161,7 +187,7 @@ All settings live in `config.php`; see `config.sample.php` for comments.
 
 | Header | Value |
 |---|---|
-| `Content-Security-Policy` | `default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' <B2 download host>; media-src <B2 download host>; form-action 'self'; base-uri 'none'; frame-ancestors 'none'` |
+| `Content-Security-Policy` | `default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' <B2 download host>; media-src <B2 download host>; form-action 'self'; base-uri 'none'; frame-ancestors 'none'` |
 | `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` (over HTTPS) |
 | `Permissions-Policy` | Everything denied except `autoplay`, `encrypted-media`, `fullscreen` and `picture-in-picture` for the same origin |
 | `X-Frame-Options` / `X-Content-Type-Options` | `DENY` / `nosniff` |
