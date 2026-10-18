@@ -2,6 +2,15 @@
 
 All notable changes to b2-browser. Versions follow [Semantic Versioning](https://semver.org/).
 
+## v2.1.1 — 2026-10
+
+### Added
+- `theme.classes`: reproduce the host site's own header and menu markup (wrapper, header, nav and toggle class names), so the site's stylesheet lays them out identically to its other pages.
+
+### Fixed
+- The app's line height and form-control resets no longer reach the site header and menu, which made the menu text slightly larger and higher than on the host site.
+- The theme button's DARK/LIGHT label is chosen by CSS before first paint, so the button never changes width after the page loads.
+
 ## v2.1.0 — 2026-10
 
 ### Added

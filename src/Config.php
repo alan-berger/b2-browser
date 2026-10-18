@@ -38,6 +38,7 @@ final class Config
         'theme' => [
             'stylesheets' => [], 'logo' => '', 'logo_alt' => '', 'heading' => '', 'heading_link' => '',
             'nav' => [], 'favicon' => '', 'toggle' => true, 'storage_key' => 'b2-theme',
+            'classes' => ['wrapper' => '', 'header' => '', 'nav' => '', 'toggle' => ''],
         ],
         'log' => ['enabled' => true, 'path' => '', 'max_bytes' => 10485760],
         'alerts' => [
@@ -220,6 +221,12 @@ final class Config
                     || trim($item[0]) === '' || !$link($item[1])) {
                     $problems[] = "theme.nav item {$i} must be ['Label', '/path-or-https-url']";
                 }
+            }
+        }
+        foreach (['wrapper', 'header', 'nav', 'toggle'] as $key) {
+            $class = $this->string("theme.classes.{$key}");
+            if ($class !== '' && !preg_match('/^[A-Za-z_-][A-Za-z0-9_ -]{0,99}$/', $class)) {
+                $problems[] = "theme.classes.{$key} must be one or more CSS class names";
             }
         }
         if (!preg_match('/^[A-Za-z0-9_.-]{1,64}$/', $this->string('theme.storage_key'))) {

@@ -123,6 +123,17 @@ return [
         // localStorage key for the light/dark choice. Use the same key as
         // your site's own toggle so the two stay in step.
         'storage_key'  => 'b2-theme',
+        // Reproduce your site's own header/menu markup so its stylesheet lays
+        // them out exactly as on your other pages. Give the CSS class names
+        // your site uses; wrapper, header and nav are all needed to enable it.
+        // The header becomes <div class=header><img logo><h1>heading</h1></div>
+        // and the nav <div class=nav><a>…</a>… <button class=toggle></div>.
+        'classes' => [
+            'wrapper' => '',   // e.g. 'blended_grid'
+            'header'  => '',   // e.g. 'pageHeader'
+            'nav'     => '',   // e.g. 'pageLeftMenu'
+            'toggle'  => '',   // e.g. 'theme-toggle'
+        ],
     ],
 
     // -----------------------------------------------------------------

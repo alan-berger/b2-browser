@@ -525,7 +525,7 @@ final class App
     {
         if (!isset($this->config)) {
             return ['stylesheets' => [], 'logo' => '', 'logoAlt' => '', 'heading' => '', 'headingLink' => '',
-                'nav' => [], 'favicon' => '', 'toggle' => true, 'storageKey' => 'b2-theme'];
+                'nav' => [], 'favicon' => '', 'toggle' => true, 'storageKey' => 'b2-theme', 'classes' => null];
         }
         $nav = [];
         foreach ((array) $this->config->get('theme.nav') as $item) {
@@ -541,6 +541,19 @@ final class App
             'favicon' => $this->config->string('theme.favicon'),
             'toggle' => $this->config->bool('theme.toggle'),
             'storageKey' => $this->config->string('theme.storage_key'),
+            // Site markup mode: when the wrapper, header and nav class names
+            // are all given, the layout reproduces the host site's own header
+            // so its stylesheet positions it identically on every page.
+            'classes' => $this->config->string('theme.classes.wrapper') !== ''
+                && $this->config->string('theme.classes.header') !== ''
+                && $this->config->string('theme.classes.nav') !== ''
+                ? [
+                    'wrapper' => $this->config->string('theme.classes.wrapper'),
+                    'header' => $this->config->string('theme.classes.header'),
+                    'nav' => $this->config->string('theme.classes.nav'),
+                    'toggle' => $this->config->string('theme.classes.toggle'),
+                ]
+                : null,
         ];
     }
 
