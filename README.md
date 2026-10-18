@@ -150,6 +150,7 @@ All settings live in `config.php`; see `config.sample.php` for comments.
 | `theme.nav` | `[]` | Navigation links, `[['LABEL', '/path'], …]` |
 | `theme.favicon` | empty | Favicon path |
 | `theme.toggle`, `theme.storage_key` | `true`, `b2-theme` | Light/dark switch and its localStorage key |
+| `theme.classes.{wrapper,header,nav,toggle}` | empty | Reproduce the host site's header/menu markup with these class names |
 | `debug` | `false` | Show error details in the browser — never in production |
 
 ## Matching your site's look
@@ -170,6 +171,7 @@ b2-browser can wear the theme of the site it's installed on: your stylesheet, fo
 
 - **Colours** come from your site's stylesheet through CSS custom properties. If it defines `--bg`, `--text`, `--text-muted`, `--border`, `--accent` and `--accent-hover` (switching them under `[data-theme="dark"]`), b2-browser uses them; anything missing falls back to the built-in palette.
 - **Fonts, width and button text colour** go in a small `public/assets/theme.css` of your own — copy `theme.example.css`. It sets `--b2-font-body`, `--b2-font-heading`, `--b2-max-width` and `--b2-on-accent`. `theme.css` is git-ignored, so upgrades never overwrite it.
+- **Identical header and menu.** Set `theme.classes` to the class names your site's own header uses (`wrapper`, `header`, `nav`, `toggle`) and b2-browser emits the same markup — logo and `<h1>` inside the header element, links and the theme button inside the nav — so your stylesheet positions them pixel-for-pixel as on every other page. Without it, b2-browser draws its own similar header.
 - **Light/dark** is an attribute on `<html>` (`data-theme`), set before first paint by `theme-init.js` and switched by the toggle. With the same `storage_key` as your site, the visitor's choice carries across both.
 - **Security is unchanged.** Stylesheets, fonts, the logo and the favicon must be served by your own site, because the CSP only allows `'self'` for those; the config rejects anything else, and navigation links must be paths or `http(s)` URLs. Your site's inline theme scripts aren't needed: b2-browser does the same job from its own external script.
 

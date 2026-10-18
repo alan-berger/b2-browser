@@ -81,8 +81,20 @@ body.b2 {
     color: var(--_text);
     font-family: var(--_font);
     font-size-adjust: var(--b2-font-size-adjust, none);
-    line-height: 1.5;
     transition: background-color 0.2s, color 0.2s;
+}
+
+/* Line height is set on the app's own content only, so a host site's header
+ * and menu keep exactly the metrics they have on the site's other pages. */
+.b2-shell,
+.b2-main {
+    line-height: 1.5;
+}
+
+/* Theme button label follows data-theme, set before first paint. */
+[data-theme="dark"] .b2-when-light,
+:root:not([data-theme="dark"]) .b2-when-dark {
+    display: none;
 }
 
 .b2 [hidden] {
@@ -114,10 +126,10 @@ body.b2 {
 
 /* Form controls are reset explicitly: site stylesheets often style bare
  * input/label/button elements, and the app's own look must win. */
-.b2 input,
-.b2 select,
-.b2 button,
-.b2 textarea {
+.b2-main input,
+.b2-main select,
+.b2-main button,
+.b2-main textarea {
     font: inherit;
     color: var(--_text);
     background: var(--_bg);
@@ -130,15 +142,15 @@ body.b2 {
     letter-spacing: normal;
 }
 
-.b2 input:focus,
-.b2 select:focus,
-.b2 button:focus-visible,
+.b2-main input:focus,
+.b2-main select:focus,
+.b2-main button:focus-visible,
 .b2 a:focus-visible {
     outline: 2px solid var(--_accent);
     outline-offset: 1px;
 }
 
-.b2 label {
+.b2-main label {
     display: inline-block;
     margin: 0;
     letter-spacing: normal;
@@ -220,6 +232,13 @@ body.b2 {
 
 .b2-main {
     padding-top: 10px;
+}
+
+/* Site markup mode: the host's header and menu are floated blocks in its
+ * stylesheet; start the app's content below them. */
+.b2-site-markup .b2-main {
+    clear: both;
+    padding: 20px 0 60px;
 }
 
 .b2-page-title {

@@ -112,8 +112,9 @@ final class ConfigTest extends TestCase
             'logo' => 'data:image/svg+xml,<svg/>',
             'nav' => [['Bad', 'javascript:alert(1)'], ['', '/'], 'nope'],
             'storage_key' => 'has space',
+            'classes' => ['wrapper' => 'ok-class', 'header' => 'bad"class', 'nav' => '', 'toggle' => '1st'],
         ]]));
-        self::assertCount(7, $problems, implode("\n", $problems));
+        self::assertCount(9, $problems, implode("\n", $problems));
     }
 
     public function testUnknownKeyThrows(): void

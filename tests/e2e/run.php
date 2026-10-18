@@ -334,6 +334,15 @@ $r = (new Client($themedApp, "{$tmp}/jar-t"))->get('');
 check(str_contains($r->body, '<link rel="stylesheet" href="/style.css">') && strpos($r->body, '/style.css') < strpos($r->body, 'assets/b2-browse.css'), 'site stylesheet linked before the app stylesheet');
 check(str_contains($r->body, 'alt="Logo &amp; &quot;mark&quot;"') && str_contains($r->body, 'example.org &lt;site&gt;'), 'logo alt text and heading are escaped');
 check(str_contains($r->body, '<a href="/b2/">B2</a>') && str_contains($r->body, 'data-theme-key="site-theme"'), 'navigation and shared theme key rendered');
+$markupApp = $startVariant($variantConfig('markup', ['theme' => [
+    'logo' => '/logo.svg', 'heading' => 'example.org', 'nav' => [['HOME', '/'], ['B2', '/b2/']],
+    'classes' => ['wrapper' => 'blended_grid', 'header' => 'pageHeader', 'nav' => 'pageLeftMenu', 'toggle' => 'theme-toggle'],
+]]));
+$r = (new Client($markupApp, "{$tmp}/jar-m"))->get('');
+check(str_contains($r->body, '<div class="blended_grid">') && str_contains($r->body, '<div class="pageHeader">')
+    && str_contains($r->body, '<img src="/logo.svg" alt="" width="64" height="64"><h1>example.org</h1>')
+    && str_contains($r->body, '<div class="pageLeftMenu">') && str_contains($r->body, 'class="theme-toggle" id="themeToggle"')
+    && !str_contains($r->body, 'b2-brand'), 'site markup mode reproduces the host header and menu');
 $badApp = $startVariant($variantConfig('badtheme', ['theme' => ['nav' => [['X', 'javascript:alert(1)']]]]));
 $r = (new Client($badApp, "{$tmp}/jar-u"))->get('');
 check($r->status === 500 && !str_contains($r->body, 'javascript:'), 'a javascript: nav link is a configuration error');
