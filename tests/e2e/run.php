@@ -515,7 +515,7 @@ function start_server(int $port, ?string $router, ?string $docroot, array $env)
 
 function wait_for(string $url): void
 {
-    for ($i = 0; $i < 50; $i++) {
+    for ($i = 0; $i < 200; $i++) { // up to 20 s: CI runners can be slow to start PHP
         $ch = curl_init($url);
         curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 1]);
         if (curl_exec($ch) !== false) {
