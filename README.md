@@ -149,6 +149,7 @@ All settings live in `config.php`; see `config.sample.php` for comments.
 | `theme.logo`, `theme.logo_alt`, `theme.heading`, `theme.heading_link` | empty | Branding shown at the top of every page |
 | `theme.nav` | `[]` | Navigation links, `[['LABEL', '/path'], …]` |
 | `theme.favicon` | empty | Favicon path |
+| `theme.login_logo`, `theme.login_logo_alt` | empty | Image above the sign-in title in place of the padlock |
 | `theme.toggle`, `theme.storage_key` | `true`, `b2-theme` | Light/dark switch and its localStorage key |
 | `theme.classes.{wrapper,header,nav,toggle}` | empty | Reproduce the host site's header/menu markup with these class names |
 | `debug` | `false` | Show error details in the browser — never in production |

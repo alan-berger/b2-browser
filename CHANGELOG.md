@@ -2,6 +2,11 @@
 
 All notable changes to b2-browser. Versions follow [Semantic Versioning](https://semver.org/).
 
+## v2.1.2 — 2026-10
+
+### Added
+- `theme.login_logo` / `theme.login_logo_alt`: an image (same-origin path) shown above the sign-in title in place of the padlock; its height is capped at 56 px and adjustable with `--b2-login-logo-height`.
+
 ## v2.1.1 — 2026-10
 
 ### Added

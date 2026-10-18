@@ -267,6 +267,15 @@ body.b2 {
     max-width: 640px;
 }
 
+.b2-login-logo {
+    display: block;
+    max-width: 100%;
+    max-height: var(--b2-login-logo-height, 56px);
+    width: auto;
+    height: auto;
+    margin: 0 auto 16px;
+}
+
 .b2-lead {
     color: var(--_muted);
     text-align: center;

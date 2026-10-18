@@ -338,7 +338,11 @@ $markupApp = $startVariant($variantConfig('markup', ['theme' => [
     'logo' => '/logo.svg', 'heading' => 'example.org', 'nav' => [['HOME', '/'], ['B2', '/b2/']],
     'classes' => ['wrapper' => 'blended_grid', 'header' => 'pageHeader', 'nav' => 'pageLeftMenu', 'toggle' => 'theme-toggle'],
 ]]));
+$logoApp = $startVariant($variantConfig('loginlogo', ['theme' => ['login_logo' => 'assets/brand.svg', 'login_logo_alt' => 'Brand "B"']]));
+$r = (new Client($logoApp, "{$tmp}/jar-l"))->get('');
+check(str_contains($r->body, '<img src="assets/brand.svg" alt="Brand &quot;B&quot;" class="b2-login-logo">') && !str_contains($r->body, '🔒'), 'login logo replaces the padlock (alt text escaped)');
 $r = (new Client($markupApp, "{$tmp}/jar-m"))->get('');
+check(str_contains($r->body, '🔒'), 'padlock shown on the sign-in page by default');
 check(str_contains($r->body, '<div class="blended_grid">') && str_contains($r->body, '<div class="pageHeader">')
     && str_contains($r->body, '<img src="/logo.svg" alt="" width="64" height="64"><h1>example.org</h1>')
     && str_contains($r->body, '<div class="pageLeftMenu">') && str_contains($r->body, 'class="theme-toggle" id="themeToggle"')
@@ -511,7 +515,7 @@ function start_server(int $port, ?string $router, ?string $docroot, array $env)
 
 function wait_for(string $url): void
 {
-    for ($i = 0; $i < 50; $i++) {
+    for ($i = 0; $i < 200; $i++) { // up to 20 s: CI runners can be slow to start PHP
         $ch = curl_init($url);
         curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 1]);
         if (curl_exec($ch) !== false) {

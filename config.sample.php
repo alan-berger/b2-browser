@@ -119,6 +119,10 @@ return [
         'heading_link' => '',          // defaults to site.homepage
         'nav'          => [],          // e.g. [['HOME', '/'], ['ABOUT', '/about.php']]
         'favicon'      => '',          // e.g. '/favicon.ico'
+        // Image shown above the title on the sign-in page instead of the
+        // padlock (height capped at 56 px; override with --b2-login-logo-height).
+        'login_logo'     => '',        // e.g. 'assets/backblaze.svg'
+        'login_logo_alt' => '',        // e.g. 'Backblaze'
         'toggle'       => true,        // light/dark switch in the navigation bar
         // localStorage key for the light/dark choice. Use the same key as
         // your site's own toggle so the two stay in step.
