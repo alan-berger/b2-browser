@@ -712,17 +712,37 @@ h1 {
     font: inherit;
 }
 
+/* Thumbnails: 16:9 to match camera snapshots; full width on phones. */
+.file-icon:has(.thumb) {
+    width: 240px;
+    height: auto;
+    flex-shrink: 0;
+}
+
+.file-icon:has(.thumb) > a {
+    display: block;
+    width: 100%;
+}
+
 .file-icon .thumb {
-    width: 64px;
-    height: 40px;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    height: auto;
     object-fit: cover;
     border-radius: 4px;
     background: #eee;
     display: block;
 }
 
-.file-icon:has(.thumb) {
-    width: 64px;
+@media (max-width: 768px) {
+    .file-icon:has(.thumb),
+    .file-icon .thumb {
+        width: 100%;
+    }
+
+    .file-icon:has(.thumb) {
+        margin: 0 0 10px;
+    }
 }
 
 .keyboard-help {
