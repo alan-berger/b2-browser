@@ -503,6 +503,7 @@ final class App
             'minutesLeft' => $authenticated ? intdiv($this->session->secondsRemaining(), 60) : 0,
             'mfaSetupLink' => isset($this->config) && $authenticated && $this->config->bool('auth.mfa_setup_page') && $this->config->mfaEnabled(),
             'debug' => isset($this->config) && $this->config->bool('debug'),
+            'theme' => $this->themeVars(),
         ];
         $html = $this->view->render($template, $vars);
 
@@ -510,6 +511,37 @@ final class App
         Http::sendSecurityHeaders($mediaOrigins, isset($this->config) ? $this->config->bool('site.hsts') : true);
         header('Content-Type: text/html; charset=UTF-8');
         echo $html;
+    }
+
+    /**
+     * Branding for the layout. Before the config has loaded (configuration
+     * error page) the plain built-in look is used.
+     *
+     * @return array{stylesheets: list<string>, logo: string, logoAlt: string, heading: string,
+     *               headingLink: string, nav: list<array{0: string, 1: string}>, favicon: string,
+     *               toggle: bool, storageKey: string}
+     */
+    private function themeVars(): array
+    {
+        if (!isset($this->config)) {
+            return ['stylesheets' => [], 'logo' => '', 'logoAlt' => '', 'heading' => '', 'headingLink' => '',
+                'nav' => [], 'favicon' => '', 'toggle' => true, 'storageKey' => 'b2-theme'];
+        }
+        $nav = [];
+        foreach ((array) $this->config->get('theme.nav') as $item) {
+            $nav[] = [(string) $item[0], (string) $item[1]];
+        }
+        return [
+            'stylesheets' => $this->config->stringList('theme.stylesheets'),
+            'logo' => $this->config->string('theme.logo'),
+            'logoAlt' => $this->config->string('theme.logo_alt'),
+            'heading' => $this->config->string('theme.heading'),
+            'headingLink' => $this->config->string('theme.heading_link') ?: $this->config->string('site.homepage'),
+            'nav' => $nav,
+            'favicon' => $this->config->string('theme.favicon'),
+            'toggle' => $this->config->bool('theme.toggle'),
+            'storageKey' => $this->config->string('theme.storage_key'),
+        ];
     }
 
     private function debugEnabled(): bool

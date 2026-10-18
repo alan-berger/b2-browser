@@ -93,6 +93,29 @@ final class ConfigTest extends TestCase
         self::assertCount(2, $problems);
     }
 
+    public function testThemeAcceptsSameOriginAssetsAndHttpsLinks(): void
+    {
+        $config = Config::fromArray($this->valid(['theme' => [
+            'stylesheets' => ['/style.css', 'assets/theme.css'],
+            'logo' => '/bimi/logo.svg',
+            'heading_link' => 'https://example.org/',
+            'nav' => [['HOME', '/'], ['GitHub', 'https://github.com/alan-berger']],
+            'storage_key' => 'site-theme',
+        ]]));
+        self::assertSame(['/style.css', 'assets/theme.css'], $config->stringList('theme.stylesheets'));
+    }
+
+    public function testThemeRejectsForeignOrScriptUrls(): void
+    {
+        $problems = $this->problems($this->valid(['theme' => [
+            'stylesheets' => ['https://cdn.example/x.css', '//evil.example/x.css'],
+            'logo' => 'data:image/svg+xml,<svg/>',
+            'nav' => [['Bad', 'javascript:alert(1)'], ['', '/'], 'nope'],
+            'storage_key' => 'has space',
+        ]]));
+        self::assertCount(7, $problems, implode("\n", $problems));
+    }
+
     public function testUnknownKeyThrows(): void
     {
         $this->expectException(\OutOfBoundsException::class);

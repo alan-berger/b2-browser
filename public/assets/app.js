@@ -6,6 +6,24 @@
 document.addEventListener('DOMContentLoaded', function () {
     'use strict';
 
+    // ------------------------------------------------------- theme toggle
+    var toggle = document.getElementById('themeToggle');
+    if (toggle) {
+        var root = document.documentElement;
+        var key = root.getAttribute('data-theme-key') || 'b2-theme';
+        var label = function () {
+            toggle.textContent = root.getAttribute('data-theme') === 'dark' ? 'LIGHT' : 'DARK';
+        };
+        label();
+        toggle.hidden = false; // only shown once JavaScript can make it work
+        toggle.addEventListener('click', function () {
+            var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            root.setAttribute('data-theme', next);
+            try { window.localStorage.setItem(key, next); } catch (e) { /* storage blocked */ }
+            label();
+        });
+    }
+
     // ---------------------------------------------------- confirm sign-out
     document.querySelectorAll('form[data-confirm]').forEach(function (form) {
         form.addEventListener('submit', function (e) {

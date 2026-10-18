@@ -2,6 +2,16 @@
 
 All notable changes to b2-browser. Versions follow [Semantic Versioning](https://semver.org/).
 
+## v2.1.0 — 2026-10
+
+### Added
+- **Site theming.** Optional `theme` settings load the host site's stylesheet, logo, heading, navigation and favicon around every page. Colours are taken from the site's CSS custom properties; fonts and width from a git-ignored `assets/theme.css` (see `theme.example.css`).
+- **Light/dark mode** with a toggle, applied before first paint by `theme-init.js`, and optionally shared with the host site through `theme.storage_key`.
+- Restyled interface: flat, theme-driven styling for the file list, player, sign-in and message pages, with readable form controls even when the host stylesheet styles bare `input`/`label` elements.
+
+### Security
+- CSP gains `font-src 'self'` so same-origin web fonts load; everything else is unchanged. Theme asset paths are validated as same-origin, and navigation links as paths or `http(s)` URLs.
+
 ## v2.0.0 — 2026-10
 
 A ground-up refactor. **Breaking:** new file layout, configuration format and

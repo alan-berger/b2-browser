@@ -35,6 +35,10 @@ final class Config
             'date_path_format' => '{Y}/{m}/{d}/',
         ],
         'site' => ['title' => 'Camera Backup Browser', 'homepage' => '/', 'hsts' => true],
+        'theme' => [
+            'stylesheets' => [], 'logo' => '', 'logo_alt' => '', 'heading' => '', 'heading_link' => '',
+            'nav' => [], 'favicon' => '', 'toggle' => true, 'storage_key' => 'b2-theme',
+        ],
         'log' => ['enabled' => true, 'path' => '', 'max_bytes' => 10485760],
         'alerts' => [
             'on_login' => true, 'on_failed_login' => true, 'on_lockout' => true,
@@ -171,9 +175,57 @@ final class Config
             $problems[] = 'rate_limit.ipv6_prefix must be between 16 and 128';
         }
 
+        $problems = array_merge($problems, $this->themeProblems());
+
         if ($problems !== []) {
             throw new ConfigException('Configuration problems: ' . implode('; ', $problems) . '.', $problems);
         }
+    }
+
+    /**
+     * Theme assets must come from this origin (the CSP only allows 'self'
+     * for styles, fonts and images); navigation links may also be absolute
+     * http(s) URLs. Anything else (javascript:, data:, //host) is rejected.
+     *
+     * @return list<string>
+     */
+    private function themeProblems(): array
+    {
+        $problems = [];
+        $sameOrigin = static fn(string $u): bool => $u !== '' && !str_starts_with($u, '//')
+            && !preg_match('#^[a-z][a-z0-9+.-]*:#i', $u) && !preg_match('/[\s"\'<>\\\\]/', $u);
+        $link = static fn(string $u): bool => $sameOrigin($u) || (bool) preg_match('#^https?://[^\s"\'<>]+$#i', $u);
+
+        foreach ($this->stringList('theme.stylesheets') as $css) {
+            if (!$sameOrigin($css)) {
+                $problems[] = "theme.stylesheets entry '{$css}' must be a path on this site";
+            }
+        }
+        foreach (['logo', 'favicon'] as $key) {
+            $value = $this->string("theme.{$key}");
+            if ($value !== '' && !$sameOrigin($value)) {
+                $problems[] = "theme.{$key} must be a path on this site";
+            }
+        }
+        $headingLink = $this->string('theme.heading_link');
+        if ($headingLink !== '' && !$link($headingLink)) {
+            $problems[] = 'theme.heading_link must be a path or an http(s) URL';
+        }
+        $nav = $this->get('theme.nav');
+        if (!is_array($nav)) {
+            $problems[] = 'theme.nav must be a list of [label, url] pairs';
+        } else {
+            foreach ($nav as $i => $item) {
+                if (!is_array($item) || !is_string($item[0] ?? null) || !is_string($item[1] ?? null)
+                    || trim($item[0]) === '' || !$link($item[1])) {
+                    $problems[] = "theme.nav item {$i} must be ['Label', '/path-or-https-url']";
+                }
+            }
+        }
+        if (!preg_match('/^[A-Za-z0-9_.-]{1,64}$/', $this->string('theme.storage_key'))) {
+            $problems[] = 'theme.storage_key may only contain letters, digits, ".", "_" and "-"';
+        }
+        return $problems;
     }
 
     /**

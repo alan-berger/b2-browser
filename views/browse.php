@@ -7,9 +7,9 @@ use B2Browser\View;
 
 $pageTitle = '';
 ?>
-<div class="container">
-    <header>
-        <h1>📹 <?= $e($siteTitle) ?></h1>
+<section class="b2-browse">
+    <div class="b2-toolbar">
+        <h1 class="b2-page-title">📹 <?= $e($siteTitle) ?></h1>
 <?php if ($authenticated): ?>
         <?= $view->partial('session_bar', compact('user', 'minutesLeft', 'mfaSetupLink', 'csrf')) ?>
 <?php endif; ?>
@@ -23,13 +23,13 @@ $pageTitle = '';
         <form method="get" action="" class="date-jump">
             <label for="date">Jump to date</label>
             <input type="date" id="date" name="date" value="<?= $e($today) ?>" max="<?= $e($today) ?>" required>
-            <button type="submit" class="btn btn-download">Go</button>
+            <button type="submit" class="btn btn-primary">Go</button>
         </form>
 <?php endif; ?>
 <?php if ($debug): ?>
         <div class="debug-info"><strong>Debug:</strong> folder "<?= $e($folder) ?>", page <?= $e($page) ?>, <?= $e(count($items)) ?> items</div>
 <?php endif; ?>
-    </header>
+    </div>
 
 <?php if ($items !== []): ?>
     <div class="filter-bar">
@@ -87,9 +87,9 @@ $pageTitle = '';
 <?php if ($item['type'] !== 'folder'): ?>
             <div class="file-actions">
 <?php if ($item['type'] === 'video'): ?>
-                <a href="<?= $e($url(['play' => $item['name']])) ?>" class="btn btn-view">▶️ Play</a>
+                <a href="<?= $e($url(['play' => $item['name']])) ?>" class="btn btn-primary">▶ Play</a>
 <?php endif; ?>
-                <a href="<?= $e($url(['download' => $item['name']])) ?>" class="btn btn-download">⬇️ Download</a>
+                <a href="<?= $e($url(['download' => $item['name']])) ?>" class="btn btn-outline">⬇ Download</a>
             </div>
 <?php endif; ?>
         </div>
@@ -111,4 +111,4 @@ $pageTitle = '';
 <?php endif; ?>
     </nav>
 <?php endif; ?>
-</div>
+</section>

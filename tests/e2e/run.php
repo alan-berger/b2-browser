@@ -108,6 +108,8 @@ foreach (['x-frame-options' => 'DENY', 'x-content-type-options' => 'nosniff', 'r
     check($r->header($h) === $v, "header {$h}: {$v}", $r->header($h));
 }
 check(str_contains($r->header('permissions-policy'), 'camera=()'), 'Permissions-Policy present');
+check(str_contains($csp, "font-src 'self'"), 'CSP allows same-origin fonts only');
+check(str_contains($r->body, '<script src="assets/theme-init.js"></script>') && !str_contains($r->body, 'class="b2-brand"'), 'unthemed page: theme init loaded, no brand header');
 $cookie = $r->header('set-cookie');
 check(stripos($cookie, 'httponly') !== false && stripos($cookie, 'samesite=strict') !== false, 'session cookie is HttpOnly + SameSite=Strict', $cookie);
 
@@ -321,6 +323,20 @@ check($r->status === 303 && $stillIn, 'regular activity keeps the session alive 
 sleep(3);
 $r = $g->get('');
 check(str_contains($r->body, 'name="password"'), 'absolute timeout ends an active session');
+
+section('Site theme');
+$themedApp = $startVariant($variantConfig('themed', ['theme' => [
+    'stylesheets' => ['/style.css', 'assets/theme.css'],
+    'logo' => '/bimi/logo.svg', 'logo_alt' => 'Logo & "mark"', 'heading' => 'example.org <site>',
+    'nav' => [['HOME', '/'], ['B2', '/b2/']], 'favicon' => '/favicon.ico', 'storage_key' => 'site-theme',
+]]));
+$r = (new Client($themedApp, "{$tmp}/jar-t"))->get('');
+check(str_contains($r->body, '<link rel="stylesheet" href="/style.css">') && strpos($r->body, '/style.css') < strpos($r->body, 'assets/b2-browse.css'), 'site stylesheet linked before the app stylesheet');
+check(str_contains($r->body, 'alt="Logo &amp; &quot;mark&quot;"') && str_contains($r->body, 'example.org &lt;site&gt;'), 'logo alt text and heading are escaped');
+check(str_contains($r->body, '<a href="/b2/">B2</a>') && str_contains($r->body, 'data-theme-key="site-theme"'), 'navigation and shared theme key rendered');
+$badApp = $startVariant($variantConfig('badtheme', ['theme' => ['nav' => [['X', 'javascript:alert(1)']]]]));
+$r = (new Client($badApp, "{$tmp}/jar-u"))->get('');
+check($r->status === 500 && !str_contains($r->body, 'javascript:'), 'a javascript: nav link is a configuration error');
 
 section('Configuration failures');
 $openApp = $startVariant($variantConfig('open', ['auth' => ['username' => '', 'password_hash' => '', 'allow_no_auth' => true]]));
