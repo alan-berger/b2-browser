@@ -39,6 +39,7 @@ final class Config
             'stylesheets' => [], 'logo' => '', 'logo_alt' => '', 'heading' => '', 'heading_link' => '',
             'nav' => [], 'favicon' => '', 'toggle' => true, 'storage_key' => 'b2-theme',
             'classes' => ['wrapper' => '', 'header' => '', 'nav' => '', 'toggle' => ''],
+            'login_logo' => '', 'login_logo_alt' => '',
         ],
         'log' => ['enabled' => true, 'path' => '', 'max_bytes' => 10485760],
         'alerts' => [
@@ -202,7 +203,7 @@ final class Config
                 $problems[] = "theme.stylesheets entry '{$css}' must be a path on this site";
             }
         }
-        foreach (['logo', 'favicon'] as $key) {
+        foreach (['logo', 'favicon', 'login_logo'] as $key) {
             $value = $this->string("theme.{$key}");
             if ($value !== '' && !$sameOrigin($value)) {
                 $problems[] = "theme.{$key} must be a path on this site";

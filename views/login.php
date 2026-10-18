@@ -4,7 +4,12 @@ $bodyClass = 'b2-page-auth';
 $pageTitle = 'Sign in';
 ?>
 <section class="b2-card b2-auth">
+<?php if ($theme['loginLogo'] !== ''): ?>
+    <img src="<?= $e($theme['loginLogo']) ?>" alt="<?= $e($theme['loginLogoAlt']) ?>" class="b2-login-logo">
+    <h1 class="b2-page-title"><?= $e($siteTitle) ?></h1>
+<?php else: ?>
     <h1 class="b2-page-title">🔒 <?= $e($siteTitle) ?></h1>
+<?php endif; ?>
 <?php if ($notice !== ''): ?>
     <div class="notice"><?= $e($notice) ?></div>
 <?php endif; ?>

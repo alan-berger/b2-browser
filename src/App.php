@@ -525,7 +525,8 @@ final class App
     {
         if (!isset($this->config)) {
             return ['stylesheets' => [], 'logo' => '', 'logoAlt' => '', 'heading' => '', 'headingLink' => '',
-                'nav' => [], 'favicon' => '', 'toggle' => true, 'storageKey' => 'b2-theme', 'classes' => null];
+                'nav' => [], 'favicon' => '', 'loginLogo' => '', 'loginLogoAlt' => '', 'toggle' => true,
+                'storageKey' => 'b2-theme', 'classes' => null];
         }
         $nav = [];
         foreach ((array) $this->config->get('theme.nav') as $item) {
@@ -539,6 +540,8 @@ final class App
             'headingLink' => $this->config->string('theme.heading_link') ?: $this->config->string('site.homepage'),
             'nav' => $nav,
             'favicon' => $this->config->string('theme.favicon'),
+            'loginLogo' => $this->config->string('theme.login_logo'),
+            'loginLogoAlt' => $this->config->string('theme.login_logo_alt'),
             'toggle' => $this->config->bool('theme.toggle'),
             'storageKey' => $this->config->string('theme.storage_key'),
             // Site markup mode: when the wrapper, header and nav class names
